@@ -1088,6 +1088,7 @@ function _cleanupShuffleHands() {
     }
   }
   requestAnimationFrame(animateOff);
+}
 
 function _endShuffleForPick() {
   _shuffleGatherActive = false;
@@ -1493,5 +1494,4 @@ async function _runPickPhase() {
     py += H * yOff;
     return { x: px, y: py };
   }
-}
 }

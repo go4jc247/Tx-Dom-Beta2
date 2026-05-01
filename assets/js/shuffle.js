@@ -1494,4 +1494,644 @@ async function _runPickPhase() {
     py += H * yOff;
     return { x: px, y: py };
   }
+  _pickPileHandCenters = {};
+  for (var seat = 0; seat < playerCount; seat++) {
+    _pickPileHandCenters[seat] = getSeatHandCenter(seat);
+    _pilePositions[seat] = _computePilePosition(seat);
+    _pileTiles[seat] = [];
+  }
+  _pickPilePositions = _pilePositions; // share with physics loop
+
+  // Draw visible containment circles
+  function _drawPileCircles() {
+    if (!SP.showPileCircles) return;
+    // Center circle (undrawn tiles)
+    var centerDiv = document.createElement('div');
+    centerDiv.id = 'pickCenterCircle';
+    centerDiv.style.cssText = 'position:absolute;border:2px dashed rgba(255,255,255,0.3);border-radius:50%;pointer-events:none;z-index:90;'
+      + 'width:' + (centerRadius * 2) + 'px;height:' + (centerRadius * 2) + 'px;'
+      + 'left:' + (centerCx - centerRadius) + 'px;top:' + (centerCy - centerRadius) + 'px;';
+    centerDiv.innerHTML = '<span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,0.2);font-size:10px;font-weight:700;font-family:system-ui,sans-serif;">DRAW</span>';
+    tableEl.appendChild(centerDiv);
+
+    // Per-seat pile circles
+    for (var seat = 0; seat < playerCount; seat++) {
+      var pos = _pilePositions[seat];
+      var isLocal = (seat === localSeat);
+      var team = (GAME_MODE === 'MOON') ? seat : (seat % 2);
+      var dealerTeamNum = (GAME_MODE === 'MOON') ? dealerSeat : (dealerSeat % 2);
+      var color = isLocal ? 'rgba(34,197,94,' : (team !== dealerTeamNum ? 'rgba(239,68,68,' : 'rgba(59,130,246,');
+      if (seat === dealerSeat) color = 'rgba(168,85,247,';
+
+      var div = document.createElement('div');
+      div.className = 'pickPileCircle';
+      div.dataset.seat = seat;
+      div.style.cssText = 'position:absolute;border:2px dashed ' + color + '0.4);border-radius:50%;pointer-events:none;z-index:90;'
+        + 'background:' + color + '0.05);'
+        + 'width:' + (pileRadius * 2) + 'px;height:' + (pileRadius * 2) + 'px;'
+        + 'left:' + (pos.x - pileRadius) + 'px;top:' + (pos.y - pileRadius) + 'px;';
+
+      var label = isLocal ? 'YOU' : ('P' + seatToPlayer(seat));
+      var playerName = isLocal ? 'YOU' : (session.game.player_names ? session.game.player_names[seat] || ('Player ' + seatToPlayer(seat)) : ('Player ' + seatToPlayer(seat)));
+      div.innerHTML = '<span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:' + color + '0.25);font-size:22px;font-weight:900;font-family:system-ui,sans-serif;text-transform:uppercase;letter-spacing:1px;white-space:nowrap;">' + playerName + '</span>';
+      tableEl.appendChild(div);
+      _pileDivs[seat] = div;
+    }
+  }
+
+  function _removePileCircles() {
+    var cc = document.getElementById('pickCenterCircle');
+    if (cc) cc.remove();
+    var circles = document.querySelectorAll('.pickPileCircle');
+    for (var i = 0; i < circles.length; i++) circles[i].remove();
+  }
+
+  // Snap a tile to a seat's pile circle (not final hand position yet)
+  function snapTileToPile(entry, seat) {
+    var pos = _pilePositions[seat];
+    _pileTiles[seat].push(entry);
+
+    // Tag the body with its pile seat — physics loop will contain it and pull it in
+    if (entry._body) {
+      entry._body._pileSeat = seat;
+      // High friction, no bounce — tiles block each other but don't bounce around
+      entry._body.friction = 0.8;
+      entry._body.frictionAir = 0.15;
+      entry._body.restitution = 0;
+      // Give it a gentle nudge toward pile center — physics does the rest
+      var dx = pos.x - entry._body.position.x;
+      var dy = pos.y - entry._body.position.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d > 1) {
+        var speed = Math.min(d * 0.15, 8);
+        Matter.Body.setVelocity(entry._body, { x: dx / d * speed, y: dy / d * speed });
+      }
+      Matter.Body.setAngularVelocity(entry._body, 0);
+    }
+  }
+
+  // After all picking, move tiles from piles to final hand positions — cascaded 200ms apart
+  async function _arrangePilesToHands() {
+    hint.textContent = 'Arranging hands...';
+    var allPromises = [];
+    for (var seat = 0; seat < playerCount; seat++) {
+      var tiles = _pileTiles[seat];
+      var playerNum = seatToPlayer(seat);
+      var isLocal = (seat === localSeat);
+      var seatDelay = seat * (200 / (SPEED_MULTIPLIER * SP.pickAnimSpeed));
+      for (var si = 0; si < tiles.length; si++) {
+        var entry = tiles[si];
+        var targetPos = getHandPosition(playerNum, si);
+        if (!targetPos) continue;
+
+        var data = { sprite: entry.sprite, tile: entry.tile, originalSlot: si };
+        sprites[seat][si] = data;
+        pickedHands[seat].push(entry.tile);
+
+        // Animate from pile to hand — cascaded start, only local player gets full 3D
+        var faceUp = isLocal;
+        (function(sp, tp, fu, delay) {
+          var speed = 600 / (SPEED_MULTIPLIER * SP.pickAnimSpeed);
+          allPromises.push(new Promise(function(r) { setTimeout(r, delay); }).then(function() {
+            return animateSprite(sp, {
+              x: tp.x, y: tp.y, s: tp.s, rz: tp.rz, ry: fu ? 180 : 0
+            }, speed).then(function() {
+              // Remove simplified rendering — all tiles need full render for gameplay
+              sp.classList.remove('shuffleSimple');
+            });
+          }));
+        })(entry.sprite, targetPos, faceUp, seatDelay);
+      }
+    }
+    await Promise.all(allPromises);
+
+    // Attach gameplay handlers for local player's tiles
+    for (var si = 0; si < sprites[localSeat].length; si++) {
+      var sd = sprites[localSeat][si];
+      if (sd && sd.sprite) {
+        (function(sp) {
+          sp.addEventListener('click', function() { handlePlayer1Click(sp); });
+          sp.addEventListener('touchstart', function(ev) {
+            ev.preventDefault(); ev.stopPropagation();
+            handlePlayer1Click(sp);
+          }, { passive: false });
+        })(sd.sprite);
+      }
+    }
+  }
+
+  _drawPileCircles();
+
+  // Snap a tile to its final hand position (make static, remove from physics flow)
+  function snapTileToHand(entry, seat, slotIdx, faceUp) {
+    entry.picked = true;
+    var playerNum = seatToPlayer(seat);
+    var targetPos = getHandPosition(playerNum, slotIdx);
+    if (!targetPos) return;
+
+    // Make physics body static at target
+    if (entry._body) {
+      Matter.Body.setStatic(entry._body, true);
+      Matter.Body.setPosition(entry._body, { x: targetPos.x + 28, y: targetPos.y + 56 });
+      Matter.Body.setAngle(entry._body, (targetPos.rz || 0) * Math.PI / 180);
+      Matter.Body.setVelocity(entry._body, { x: 0, y: 0 });
+    }
+
+    entry.sprite.classList.remove('shuffleSimple');
+    entry.sprite.setPose({
+      x: targetPos.x, y: targetPos.y,
+      s: targetPos.s, rz: targetPos.rz,
+      ry: faceUp ? 180 : 0
+    });
+    bringToFront(entry.sprite);
+
+    var data = { sprite: entry.sprite, tile: entry.tile, originalSlot: slotIdx };
+    sprites[seat][slotIdx] = data;
+    pickedHands[seat].push(entry.tile);
+  }
+
+  // Find pool entry for a physics body
+  function poolEntryForBody(body) {
+    for (var i = 0; i < pool.length; i++) {
+      if (pool[i]._body === body && !pool[i].picked) return pool[i];
+    }
+    return null;
+  }
+
+  // Find closest unpicked body to a point
+  function findUnpickedBodyAt(px, py, maxDist) {
+    var best = null, bestD2 = maxDist * maxDist;
+    for (var i = 0; i < pool.length; i++) {
+      if (pool[i].picked || !pool[i]._body) continue;
+      var b = pool[i]._body;
+      var dx = b.position.x - px, dy = b.position.y - py;
+      var d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) { bestD2 = d2; best = b; }
+    }
+    return best;
+  }
+
+  // Find a tile in the local player's pile (for rearranging)
+  function findPileBodyAt(px, py, maxDist) {
+    var best = null, bestD2 = maxDist * maxDist;
+    var tiles = _pileTiles[localSeat] || [];
+    for (var i = 0; i < tiles.length; i++) {
+      var b = tiles[i]._body;
+      if (!b) continue;
+      var dx = b.position.x - px, dy = b.position.y - py;
+      var d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) { bestD2 = d2; best = b; }
+    }
+    return best;
+  }
+
+  // Create a physics constraint to drag a body
+  function grabBody(body, px, py) {
+    var c = Matter.Constraint.create({
+      pointA: { x: px, y: py },
+      bodyB: body,
+      pointB: { x: px - body.position.x, y: py - body.position.y },
+      stiffness: 0.8, damping: 0.1, length: 0
+    });
+    Matter.Composite.add(_shufflePhysicsEngine.world, c);
+    return c;
+  }
+  function releaseGrab(constraint) {
+    if (constraint) Matter.Composite.remove(_shufflePhysicsEngine.world, constraint);
+  }
+
+  // ── TEAM-BASED DRAW ORDER ──
+  // Determine draw groups based on shuffler's team
+  var dealerSeat = session.dealer;
+  var dealerTeam = (GAME_MODE === 'MOON') ? dealerSeat : (dealerSeat % 2);
+  var localTeam = (GAME_MODE === 'MOON') ? localSeat : (localSeat % 2);
+
+  // Build draw groups: opponents first, then partners, then shuffler auto-gets rest
+  var opponentSeats = [];
+  var partnerSeats = [];
+  for (var gs = 0; gs < playerCount; gs++) {
+    if (gs === dealerSeat) continue;
+    var seatTeam = (GAME_MODE === 'MOON') ? gs : (gs % 2);
+    if (seatTeam !== dealerTeam) {
+      opponentSeats.push(gs);
+    } else {
+      partnerSeats.push(gs);
+    }
+  }
+
+  // Determine which group the local player is in
+  var localIsShuffler = (localSeat === dealerSeat);
+  var localIsOpponent = opponentSeats.indexOf(localSeat) >= 0;
+  var localIsPartner = partnerSeats.indexOf(localSeat) >= 0;
+
+  // ── Physics-based player pick — drag with constraints, tiles bump ──
+  var playerPicked = 0;
+  var _pickGrabs = {}; // touchId -> { body, constraint, entry }
+  var _pickMouseGrab = null;
+  var localHandCenter = getSeatHandCenter(localSeat);
+  var snapZoneY = getRect().height * 0.6;
+
+  function pickTileForPlayer(entry) {
+    if (playerPicked >= handSize || entry.picked) return;
+    playerPicked++;
+    entry.picked = true;
+    snapTileToPile(entry, localSeat);
+    counter.textContent = playerPicked + ' / ' + handSize;
+    entry.sprite.addEventListener('click', function() { handlePlayer1Click(entry.sprite); });
+    entry.sprite.addEventListener('touchstart', function(ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      handlePlayer1Click(entry.sprite);
+    }, { passive: false });
+  }
+
+  function playerPickPhase() {
+    return new Promise(function(resolve) {
+      // Don't overwrite hint if it was already set by the group label
+      if (!hint.textContent || hint.textContent.indexOf('slide') < 0) {
+        hint.textContent = 'Slide ' + handSize + ' dominoes to your hand';
+      }
+      counter.textContent = '0 / ' + handSize;
+
+      function onTouchStart(e) {
+        e.preventDefault();
+        var br = overlay.getBoundingClientRect();
+        for (var ti = 0; ti < e.changedTouches.length; ti++) {
+          var t = e.changedTouches[ti];
+          var tx = t.clientX - br.left, ty = t.clientY - br.top;
+          // Count unpicked bodies for debugging
+          var unpickedCount = 0;
+          for (var di = 0; di < pool.length; di++) {
+            if (!pool[di].picked && pool[di]._body) unpickedCount++;
+          }
+          var body = findUnpickedBodyAt(tx, ty, 80);
+          var isPileGrab = false;
+          if (!body) {
+            body = findPileBodyAt(tx, ty, 60);
+            isPileGrab = !!body;
+          }
+          console.log('[Pick] touch at', Math.round(tx), Math.round(ty), 'found body:', !!body, 'pile:', isPileGrab, 'unpicked:', unpickedCount);
+          if (body) {
+            _pickGrabs[t.identifier] = { body: body, constraint: grabBody(body, tx, ty), entry: poolEntryForBody(body), isPileGrab: isPileGrab };
+          }
+        }
+      }
+      function onTouchMove(e) {
+        e.preventDefault();
+        var br = overlay.getBoundingClientRect();
+        for (var ti = 0; ti < e.changedTouches.length; ti++) {
+          var t = e.changedTouches[ti];
+          var g = _pickGrabs[t.identifier];
+          if (g) { g.constraint.pointA.x = t.clientX - br.left; g.constraint.pointA.y = t.clientY - br.top; }
+        }
+      }
+      function onTouchEnd(e) {
+        e.preventDefault();
+        var br = overlay.getBoundingClientRect();
+        for (var ti = 0; ti < e.changedTouches.length; ti++) {
+          var t = e.changedTouches[ti];
+          var g = _pickGrabs[t.identifier];
+          if (g) {
+            releaseGrab(g.constraint);
+            if (!g.isPileGrab && g.entry && !g.entry.picked && (t.clientY - br.top) > snapZoneY) pickTileForPlayer(g.entry);
+            delete _pickGrabs[t.identifier];
+          }
+        }
+        if (playerPicked >= handSize) { cleanup(); resolve(); }
+      }
+      function onMouseDown(e) {
+        var br = overlay.getBoundingClientRect();
+        var mx = e.clientX - br.left, my = e.clientY - br.top;
+        var body = findUnpickedBodyAt(mx, my, 80);
+        var isPileGrab = false;
+        if (!body) { body = findPileBodyAt(mx, my, 60); isPileGrab = !!body; }
+        if (body) _pickMouseGrab = { body: body, constraint: grabBody(body, mx, my), entry: poolEntryForBody(body), isPileGrab: isPileGrab };
+      }
+      function onMouseMove(e) {
+        if (!_pickMouseGrab) return;
+        var br = overlay.getBoundingClientRect();
+        _pickMouseGrab.constraint.pointA.x = e.clientX - br.left;
+        _pickMouseGrab.constraint.pointA.y = e.clientY - br.top;
+      }
+      function onMouseUp(e) {
+        if (!_pickMouseGrab) return;
+        releaseGrab(_pickMouseGrab.constraint);
+        var br = overlay.getBoundingClientRect();
+        if (!_pickMouseGrab.isPileGrab && _pickMouseGrab.entry && !_pickMouseGrab.entry.picked && (e.clientY - br.top) > snapZoneY) pickTileForPlayer(_pickMouseGrab.entry);
+        _pickMouseGrab = null;
+        if (playerPicked >= handSize) { cleanup(); resolve(); }
+      }
+      function cleanup() {
+        overlay.removeEventListener('touchstart', onTouchStart);
+        overlay.removeEventListener('touchmove', onTouchMove);
+        overlay.removeEventListener('touchend', onTouchEnd);
+        overlay.removeEventListener('mousedown', onMouseDown);
+        overlay.removeEventListener('mousemove', onMouseMove);
+        overlay.removeEventListener('mouseup', onMouseUp);
+      }
+      overlay.addEventListener('touchstart', onTouchStart, { passive: false });
+      overlay.addEventListener('touchmove', onTouchMove, { passive: false });
+      overlay.addEventListener('touchend', onTouchEnd, { passive: false });
+      overlay.addEventListener('mousedown', onMouseDown);
+      overlay.addEventListener('mousemove', onMouseMove);
+      overlay.addEventListener('mouseup', onMouseUp);
+    });
+  }
+
+  // ── AI pick — single controller, round-robin, colored ghost fingers ──
+
+  function slideTileToSeat(entry, aiSeat, slotIdx, seatCenter, color) {
+    if (!entry._body) {
+      snapTileToPile(entry, aiSeat);
+      return Promise.resolve();
+    }
+    entry.picked = true;
+    // Use pile position as target — spread tiles out so they don't stack on one point
+    var pilePos = _pilePositions[aiSeat];
+    if (pilePos) { seatCenter = pilePos; }
+    var body = entry._body;
+    if (body.isStatic) Matter.Body.setStatic(body, false);
+    // Softer constraint so tiles can't force through each other
+    var constraint = Matter.Constraint.create({
+      pointA: { x: body.position.x, y: body.position.y },
+      bodyB: body,
+      pointB: { x: 0, y: 0 },
+      stiffness: 0.3, damping: 0.2, length: 0
+    });
+    Matter.Composite.add(_shufflePhysicsEngine.world, constraint);
+    var startX = body.position.x, startY = body.position.y;
+    // Offset target within pile circle so tiles spread out
+    var spreadAngle = slotIdx * (Math.PI * 2 / Math.max(handSize, 1)) + Math.random() * 0.3;
+    var spreadDist = pileRadius ? pileRadius * 0.35 : 20;
+    var targetX = seatCenter.x + Math.cos(spreadAngle) * spreadDist;
+    var targetY = seatCenter.y + Math.sin(spreadAngle) * spreadDist;
+    var slideDuration = (800 + Math.random() * 400) / (SPEED_MULTIPLIER * SP.pickAnimSpeed);
+    var slideStart = performance.now();
+
+    // Create ghost finger circle
+    var ghost = document.createElement('div');
+    ghost.className = 'aiPickGhost';
+    ghost.style.cssText = 'position:absolute;width:60px;height:60px;border:3px solid ' + color + '0.7);border-radius:50%;pointer-events:none;z-index:505;transform:translate(-50%,-50%);background:' + color + '0.1);';
+    ghost.style.left = startX + 'px';
+    ghost.style.top = startY + 'px';
+    tableEl.appendChild(ghost);
+
+    return new Promise(function(resolveSlide) {
+      var resolved = false;
+      var slideInterval = setInterval(function() {
+        if (resolved) return;
+        var elapsed = performance.now() - slideStart;
+        var t = Math.min(1, elapsed / slideDuration);
+        var et = 1 - Math.pow(1 - t, 2); // ease-out
+        var cx = startX + (targetX - startX) * et;
+        var cy = startY + (targetY - startY) * et;
+        constraint.pointA.x = cx;
+        constraint.pointA.y = cy;
+        ghost.style.left = cx + 'px';
+        ghost.style.top = cy + 'px';
+        if (t >= 1) {
+          resolved = true;
+          clearInterval(slideInterval);
+          releaseGrab(constraint);
+          ghost.remove();
+          snapTileToPile(entry, aiSeat);
+          resolveSlide();
+        }
+      }, 16);
+      // Safety timeout — force resolve if animation gets stuck
+      setTimeout(function() {
+        if (!resolved) {
+          resolved = true;
+          clearInterval(slideInterval);
+          try { releaseGrab(constraint); } catch(e) {}
+          ghost.remove();
+          snapTileToPile(entry, aiSeat);
+          resolveSlide();
+        }
+      }, slideDuration + 2000);
+    });
+  }
+
+  async function aiGroupPick(seats, groupLabel) {
+    if (seats.length === 0) return;
+    if (groupLabel) hint.textContent = groupLabel;
+
+    var seatCenters = {};
+    var seatPicks = {};
+    for (var si = 0; si < seats.length; si++) {
+      seatCenters[seats[si]] = getSeatHandCenter(seats[si]);
+      seatPicks[seats[si]] = 0;
+    }
+
+    // Each AI seat takes 3-5 seconds total, grabs spread across that window
+    // Sometimes grabs 2 at once (two hands), with natural timing variation
+    var totalTime = (3000 + Math.random() * 2000) / (SPEED_MULTIPLIER * SP.pickAnimSpeed);
+    var allSlides = [];
+    for (var si = 0; si < seats.length; si++) {
+      (function(aiSeat) {
+        var color = AI_SEAT_COLORS[aiSeat % AI_SEAT_COLORS.length];
+        var center = seatCenters[aiSeat];
+        var picked = 0;
+        allSlides.push((async function() {
+          // Spread grabs across totalTime — figure out how many grab events
+          var grabs = [];
+          var rem = handSize;
+          while (rem > 0) {
+            var gc = (Math.random() < 0.35 && rem >= 2) ? 2 : 1;
+            grabs.push(gc);
+            rem -= gc;
+          }
+          var gap = totalTime / grabs.length;
+          var slidePs = []; // collect all slide promises
+          for (var gi = 0; gi < grabs.length; gi++) {
+            // Speed-up: grab all remaining at once
+            if (_pickSpeedUp) {
+              while (picked < handSize) {
+                var av = [];
+                for (var j2 = 0; j2 < pool.length; j2++) {
+                  if (!pool[j2].picked && pool[j2]._body && !pool[j2]._body.isStatic) av.push(pool[j2]);
+                }
+                if (av.length === 0) break;
+                var en = av[Math.floor(Math.random() * av.length)];
+                en.picked = true;
+                slidePs.push(slideTileToSeat(en, aiSeat, picked, center, color));
+                picked++;
+              }
+              break;
+            }
+            var grabCount = grabs[gi];
+            for (var g = 0; g < grabCount; g++) {
+              var available = [];
+              for (var j = 0; j < pool.length; j++) {
+                if (!pool[j].picked && pool[j]._body && !pool[j]._body.isStatic) available.push(pool[j]);
+              }
+              if (available.length === 0) break;
+              var entry = available[Math.floor(Math.random() * available.length)];
+              entry.picked = true;
+              slidePs.push(slideTileToSeat(entry, aiSeat, picked, center, color));
+              picked++;
+              // Tiny stagger between two-handed grabs
+              if (g === 0 && grabCount > 1) {
+                await new Promise(function(r) { setTimeout(r, 80 + Math.random() * 120); });
+              }
+            }
+            // Wait before next grab — spread across total time with some jitter
+            if (gi < grabs.length - 1) {
+              await new Promise(function(r) { setTimeout(r, gap * (0.7 + Math.random() * 0.6)); });
+            }
+          }
+          // Wait for all slides to fully arrive — no stranded tiles
+          await Promise.all(slidePs);
+        })());
+      })(seats[si]);
+    }
+    await Promise.all(allSlides);
+
+    var ghosts = document.querySelectorAll('.aiPickGhost');
+    for (var gi = 0; gi < ghosts.length; gi++) ghosts[gi].remove();
+    await new Promise(function(r) { setTimeout(r, 300 / (SPEED_MULTIPLIER * SP.pickAnimSpeed)); });
+  }
+
+  // Shuffler auto-gets remaining tiles — sweep via physics
+  async function shufflerAutoGet() {
+    hint.textContent = 'Shuffler gets remaining tiles...';
+    counter.textContent = '';
+    var shufflerCenter = getSeatHandCenter(dealerSeat);
+    var shufflerPick = 0;
+    var faceUp = (dealerSeat === localSeat);
+    var color = AI_SEAT_COLORS[dealerSeat % AI_SEAT_COLORS.length];
+    var remaining = [];
+    for (var j = 0; j < pool.length; j++) {
+      if (!pool[j].picked && pool[j]._body && !pool[j]._body.isStatic) remaining.push(pool[j]);
+    }
+
+    if (GAME_MODE === 'MOON') {
+      // Moon: shuffler grabs all but 1 at same time, last one goes to widow
+      var widowEntry = remaining.pop(); // last one = widow
+      var sweepSlides = [];
+      for (var ri = 0; ri < remaining.length; ri++) {
+        sweepSlides.push(slideTileToSeat(remaining[ri], dealerSeat, shufflerPick, shufflerCenter, color));
+        shufflerPick++;
+      }
+      await Promise.all(sweepSlides);
+      // Send the widow tile to the widow position
+      if (widowEntry) {
+        widowEntry.picked = true;
+        var wp = getWidowPose();
+        if (widowEntry._body) {
+          widowEntry._body._pileSeat = -1; // exempt from pile containment
+          Matter.Body.setPosition(widowEntry._body, { x: wp.x + 28, y: wp.y + 56 });
+          Matter.Body.setVelocity(widowEntry._body, { x: 0, y: 0 });
+          Matter.Body.setStatic(widowEntry._body, true);
+        }
+        widowEntry.sprite.classList.remove('shuffleSimple');
+        widowEntry.sprite.setPose(wp);
+        // Store widow tile in session
+        if (widowEntry.tile) {
+          session.moon_widow = [widowEntry.tile.a, widowEntry.tile.b];
+        }
+      }
+    } else {
+      // Shuffler grabs all remaining at the same time
+      var sweepSlides = [];
+      for (var ri = 0; ri < remaining.length; ri++) {
+        sweepSlides.push(slideTileToSeat(remaining[ri], dealerSeat, shufflerPick, shufflerCenter, color));
+        shufflerPick++;
+      }
+      await Promise.all(sweepSlides);
+    }
+    var ghosts = document.querySelectorAll('.aiPickGhost');
+    for (var gi = 0; gi < ghosts.length; gi++) ghosts[gi].remove();
+    await new Promise(function(r) { setTimeout(r, 200 / (SPEED_MULTIPLIER * SP.pickAnimSpeed)); });
+  }
+
+  // Brief pause after gather so player can see the tiles before AI picks start
+  await new Promise(function(r) { setTimeout(r, 2000 / SPEED_MULTIPLIER); });
+
+  // ── EXECUTE DRAW ORDER ──
+  // Group 1: Opponents of shuffler
+  var aiOpponents = opponentSeats.filter(function(s) { return s !== localSeat; });
+  if (localIsOpponent) {
+    hint.textContent = 'Your team picks — slide ' + handSize + ' dominoes';
+    await Promise.all([
+      playerPickPhase(),
+      aiGroupPick(aiOpponents, '')  // empty label — player hint takes priority
+    ]);
+  } else {
+    await aiGroupPick(opponentSeats, 'Opponents picking...');
+  }
+
+  // Group 2: Partners of shuffler (not shuffler themselves)
+  var aiPartners = partnerSeats.filter(function(s) { return s !== localSeat; });
+  if (localIsPartner) {
+    hint.textContent = 'Your turn — slide ' + handSize + ' dominoes';
+    await Promise.all([
+      playerPickPhase(),
+      aiGroupPick(aiPartners, '')  // empty label — player hint takes priority
+    ]);
+  } else if (partnerSeats.length > 0) {
+    await aiGroupPick(partnerSeats, 'Partner(s) picking...');
+  }
+
+  // Group 3: Shuffler gets rest
+  if (localIsShuffler) {
+    // In Moon, shuffler picks manually; otherwise auto-get
+    if (GAME_MODE === 'MOON') {
+      await playerPickPhase();
+    } else {
+      await shufflerAutoGet();
+    }
+  } else {
+    if (GAME_MODE === 'MOON') {
+      await aiGroupPick([dealerSeat], 'Shuffler picking...');
+    } else {
+      await shufflerAutoGet();
+    }
+  }
+
+  // Stop physics loop but DON'T reset sprites (we animate them ourselves)
+  _shufflePhysicsActive = false;
+  if (_shufflePhysicsRAF) { cancelAnimationFrame(_shufflePhysicsRAF); _shufflePhysicsRAF = null; }
+
+  // Sync _pose from physics body positions so animateSprite starts from correct spot
+  var _syncSc = SP.tileScale;
+  for (var _si = 0; _si < _shufflePhysicsBodies.length; _si++) {
+    var _sb = _shufflePhysicsBodies[_si];
+    var _ssp = _shufflePhysicsRealSprites[_si];
+    if (_ssp && _sb) {
+      _ssp._pose = {
+        x: _sb.position.x - 28, y: _sb.position.y - 56,
+        s: _syncSc, rz: _sb.angle * 180 / Math.PI, ry: 0
+      };
+    }
+  }
+
+  // ── ARRANGE: animate tiles from pile circles to final hand positions ──
+  await _arrangePilesToHands();
+  // Brief pause so pile circles stay visible during animation
+  await new Promise(function(r) { setTimeout(r, 500 / (SPEED_MULTIPLIER * SP.pickAnimSpeed)); });
+  _removePileCircles();
+
+  // Now fully tear down physics engine
+  _endShufflePhysics();
+
+  // ── FINALIZE: inject picked hands into the game engine ──
+  session.game.set_hands(pickedHands, 0);
+
+  // Clean up pick UI
+  if (overlay.parentNode) overlay.remove();
+  if (hint.parentNode) hint.remove();
+  if (counter.parentNode) counter.remove();
+  if (speedBtn.parentNode) speedBtn.remove();
+  if (pileGearBtn.parentNode) pileGearBtn.remove();
+  var _pPanel = document.getElementById('pileSettingsPanel');
+  if (_pPanel) _pPanel.remove();
+
+  // Brief pause before UI comes back
+  await new Promise(function(r) { setTimeout(r, 300 / (SPEED_MULTIPLIER * SP.pickAnimSpeed)); });
+
+  // Tiles are in place — now fade UI back in
+  _setShuffleTableUI(true);
+
+  // Clear the pool reference
+  _shufflePickPool = [];
 }

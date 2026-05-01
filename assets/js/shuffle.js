@@ -11,6 +11,9 @@ function _sandboxResetIdleTimer() {}
 function _sandboxStopIdleTimer() {}
 if (typeof _shufflePickPool === 'undefined') var _shufflePickPool = [];
 
+var _pickPilePositions = null;
+var _pickPileRadius = 0;
+
 var _shufflePhysicsActive = false;
 var _shufflePhysicsEngine = null;
 var _shufflePhysicsBodies = [];

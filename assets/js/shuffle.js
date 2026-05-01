@@ -53,28 +53,13 @@ function shGetElbow(shoulder, wrist, bendDir) {
 }
 
 function shDrawHandParts(c, wx, wy, index, W, H) {
-  var anchors = [{ xf: 0.22, side: -1 }, { xf: 0.78, side: 1 }];
-  var anchor = anchors[index % 2];
-  var shoulder = { x: W * anchor.xf, y: H * SH_SHOULDER_DEPTH };
-  var wrist = { x: wx, y: wy };
-  var elbow = shGetElbow(shoulder, wrist, anchor.side);
-  var fw = shGetForearmW(W);
-
-  shConstantSegment(c, shoulder, elbow, fw);
-  c.beginPath(); c.arc(shoulder.x, shoulder.y, fw / 2, 0, Math.PI * 2); c.fill();
-  c.beginPath(); c.arc(elbow.x, elbow.y, fw / 2, 0, Math.PI * 2); c.fill();
-  shConstantSegment(c, elbow, wrist, fw);
-  c.beginPath(); c.arc(wrist.x, wrist.y, fw / 2, 0, Math.PI * 2); c.fill();
-
-  var dx = wrist.x - elbow.x, dy = wrist.y - elbow.y;
-  var dir = Math.atan2(dy, dx);
+  // Just the hand shape, always vertical (pointing up), no arms
   var handPath = (index % 2 === 0) ? SHUFFLE_LEFT_HAND : SHUFFLE_RIGHT_HAND;
   var wc = (index % 2 === 0) ? SH_LEFT_WC : SH_RIGHT_WC;
   var sc = shGetScale(W);
 
   c.save();
-  c.translate(wrist.x, wrist.y);
-  c.rotate(dir + Math.PI / 2);
+  c.translate(wx, wy);
   c.scale(sc, sc);
   c.translate(-wc.x, -wc.y);
   c.fill(handPath);

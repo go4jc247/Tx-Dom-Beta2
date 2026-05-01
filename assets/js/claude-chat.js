@@ -89,6 +89,8 @@
           // Skip own messages — already shown locally on send
           if (!isSelf) {
             claudeChatAddMessage(msg.name || 'Unknown', msg.text || '', false, false);
+            // Got a reply — stop retrying
+            ccClearPending();
           }
         }
       } catch (e) {
@@ -131,7 +133,10 @@
     ccReconnectDelay = Math.min(ccReconnectDelay * 2, 30000);
   }
 
-  // ---- Send ----
+  // ---- Send with retry until acknowledged ----
+  let ccRetryTimer = null;
+  let ccPendingMsg = null;
+
   window.claudeChatSend = function() {
     const input = document.getElementById('claudeChatInput');
     if (!input) return;
@@ -140,21 +145,40 @@
     if (!ccSocket || ccSocket.readyState !== WebSocket.OPEN) return;
 
     const name = (typeof playerName !== 'undefined' && playerName) ? playerName : 'Player';
-    ccSocket.send(JSON.stringify({
+    const msgPayload = {
       type: 'chat',
       room: CC_ROOM,
       seat: 0,
       name: name,
       text: text,
       t: Date.now()
-    }));
+    };
 
-    // Show own message locally
+    // Send immediately
+    ccSocket.send(JSON.stringify(msgPayload));
+
+    // Show own message locally (once)
     claudeChatAddMessage(name, text, true, false);
 
     input.value = '';
     input.focus();
+
+    // Keep re-sending every 3 seconds until we get a reply
+    ccPendingMsg = msgPayload;
+    if (ccRetryTimer) clearInterval(ccRetryTimer);
+    ccRetryTimer = setInterval(function() {
+      if (!ccPendingMsg) { clearInterval(ccRetryTimer); ccRetryTimer = null; return; }
+      if (ccSocket && ccSocket.readyState === WebSocket.OPEN) {
+        ccSocket.send(JSON.stringify(ccPendingMsg));
+      }
+    }, 3000);
   };
+
+  // Stop retrying when we receive a reply
+  function ccClearPending() {
+    ccPendingMsg = null;
+    if (ccRetryTimer) { clearInterval(ccRetryTimer); ccRetryTimer = null; }
+  }
 
   // ---- Display ----
   window.claudeChatAddMessage = function(name, text, isSelf, isSystem) {

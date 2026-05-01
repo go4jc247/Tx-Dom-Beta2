@@ -410,15 +410,12 @@ function _proceduralMix(cx, cy, r, ptr) {
 }
 
 function _setShuffleTableUI(visible) {
+  // Simplified: just hide/show non-essential UI during shuffle, keep settings accessible
   _shuffleUIHidden = !visible;
   var opacity = visible ? '1' : '0';
   var transition = 'opacity 0.5s ease';
-
-  // Hide everything inside tableMain EXCEPT spriteLayer, shadowLayer, and shuffle UI
   var keepVisible = { 'spriteLayer':1, 'shadowLayer':1, 'shufflePhysicsOverlay':1,
-    'shuffleBtnBar':1, 'shuffleHint':1, 'shuffleAreaRing':1, 'shuffleSettingsPanel':1,
-    'pickPhaseOverlay':1, 'pickHint':1, 'pickCounter':1, 'pickSpeedBtn':1,
-    'pileSettingsPanel':1, 'pickCenterCircle':1 };
+    'settingsBtn':1, 'settingsMenu':1, 'shuffleHandCanvas':1 };
   var tableMain = document.getElementById('tableMain');
   if (tableMain) {
     for (var i = 0; i < tableMain.children.length; i++) {
@@ -426,20 +423,6 @@ function _setShuffleTableUI(visible) {
       if (keepVisible[child.id]) continue;
       child.style.transition = transition;
       child.style.opacity = opacity;
-      if (!visible) child.style.pointerEvents = 'none';
-      else child.style.pointerEvents = '';
-    }
-  }
-
-  // Also hide elements outside tableMain
-  var outerEls = ['statusBar', 'trumpDisplay'];
-  for (var i = 0; i < outerEls.length; i++) {
-    var el = document.getElementById(outerEls[i]);
-    if (el) {
-      el.style.transition = transition;
-      el.style.opacity = opacity;
-      if (!visible) el.style.pointerEvents = 'none';
-      else el.style.pointerEvents = '';
     }
   }
 }
@@ -574,8 +557,76 @@ function _startShufflePhysics() {
     tableEl.appendChild(ring);
   }
 
-  // Create UI overlay for mouse/touch capture + buttons
-  _createShuffleUI(rect);
+  // Create touch/mouse capture overlay (no buttons/sandbox UI)
+  var overlay = document.createElement('div');
+  overlay.id = 'shufflePhysicsOverlay';
+  overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:500;touch-action:none;';
+  var tableEl = document.getElementById('tableMain');
+  if (tableEl) tableEl.appendChild(overlay);
+
+  // Mouse events
+  overlay.addEventListener('mousedown', function(e) {
+    _shufflePhysicsPointer.active = true;
+    _shufflePhysicsPointer._isTouch = false;
+    var r = tableEl.getBoundingClientRect();
+    _shufflePhysicsPointer.x = _shufflePhysicsPointer.px = e.clientX - r.left;
+    _shufflePhysicsPointer.y = _shufflePhysicsPointer.py = e.clientY - r.top;
+  });
+  overlay.addEventListener('mousemove', function(e) {
+    if (!_shufflePhysicsPointer.active) return;
+    var r = tableEl.getBoundingClientRect();
+    _shufflePhysicsPointer.px = _shufflePhysicsPointer.x;
+    _shufflePhysicsPointer.py = _shufflePhysicsPointer.y;
+    _shufflePhysicsPointer.x = e.clientX - r.left;
+    _shufflePhysicsPointer.y = e.clientY - r.top;
+    _shufflePhysicsPointer.vx = _shufflePhysicsPointer.x - _shufflePhysicsPointer.px;
+    _shufflePhysicsPointer.vy = _shufflePhysicsPointer.y - _shufflePhysicsPointer.py;
+  });
+  overlay.addEventListener('mouseup', function() { _shufflePhysicsPointer.active = false; });
+  overlay.addEventListener('mouseleave', function() { _shufflePhysicsPointer.active = false; });
+
+  // Touch events
+  overlay.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    _shufflePhysicsPointer.active = true;
+    _shufflePhysicsPointer._isTouch = true;
+    var r = tableEl.getBoundingClientRect();
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var t = e.changedTouches[i];
+      _shuffleTouchPointers[t.identifier] = {
+        x: t.clientX - r.left, y: t.clientY - r.top,
+        px: t.clientX - r.left, py: t.clientY - r.top,
+        vx: 0, vy: 0
+      };
+    }
+  }, { passive: false });
+  overlay.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    var r = tableEl.getBoundingClientRect();
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var t = e.changedTouches[i];
+      var tp = _shuffleTouchPointers[t.identifier];
+      if (tp) {
+        tp.px = tp.x; tp.py = tp.y;
+        tp.x = t.clientX - r.left; tp.y = t.clientY - r.top;
+        tp.vx = tp.x - tp.px; tp.vy = tp.y - tp.py;
+      }
+    }
+    // Sync primary pointer
+    var first = e.changedTouches[0];
+    _shufflePhysicsPointer.px = _shufflePhysicsPointer.x;
+    _shufflePhysicsPointer.py = _shufflePhysicsPointer.y;
+    _shufflePhysicsPointer.x = first.clientX - r.left;
+    _shufflePhysicsPointer.y = first.clientY - r.top;
+    _shufflePhysicsPointer.vx = _shufflePhysicsPointer.x - _shufflePhysicsPointer.px;
+    _shufflePhysicsPointer.vy = _shufflePhysicsPointer.y - _shufflePhysicsPointer.py;
+  }, { passive: false });
+  overlay.addEventListener('touchend', function(e) {
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      delete _shuffleTouchPointers[e.changedTouches[i].identifier];
+    }
+    if (Object.keys(_shuffleTouchPointers).length === 0) _shufflePhysicsPointer.active = false;
+  });
 
   // Start physics loop
   _shufflePhysicsLoop();

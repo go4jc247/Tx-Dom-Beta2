@@ -14,6 +14,86 @@ if (typeof _shufflePickPool === 'undefined') var _shufflePickPool = [];
 var _pickPilePositions = null;
 var _pickPileRadius = 0;
 
+// ═══ Hand rendering code (baked from v6 sandbox) ═══
+var SHUFFLE_LEFT_HAND = new Path2D("M 559 792 L 562 792 L 580 782 L 605 766 L 637 742 L 642 736 L 644 736 L 655 725 L 655 723 L 661 718 L 661 716 L 669 709 L 679 696 L 717 659 L 729 642 L 729 640 L 742 628 L 748 624 L 755 616 L 758 615 L 761 611 L 763 605 L 763 598 L 760 595 L 758 590 L 752 583 L 743 580 L 738 580 L 737 578 L 732 578 L 731 580 L 723 580 L 710 584 L 695 591 L 679 602 L 676 605 L 676 610 L 675 611 L 671 611 L 665 614 L 641 633 L 628 639 L 619 639 L 620 643 L 620 650 L 619 651 L 615 651 L 608 642 L 604 641 L 604 635 L 602 631 L 600 615 L 593 586 L 593 568 L 597 547 L 603 526 L 634 464 L 648 428 L 656 414 L 656 411 L 660 407 L 682 368 L 682 364 L 685 361 L 687 353 L 686 348 L 687 339 L 685 338 L 684 334 L 678 327 L 671 324 L 668 324 L 667 322 L 663 322 L 662 324 L 658 324 L 650 328 L 647 331 L 625 361 L 589 399 L 579 418 L 569 441 L 555 464 L 543 477 L 537 481 L 527 485 L 522 485 L 521 480 L 522 477 L 524 476 L 526 468 L 528 467 L 530 456 L 543 406 L 559 374 L 568 359 L 575 345 L 575 342 L 577 341 L 584 327 L 588 315 L 588 310 L 589 309 L 588 297 L 586 296 L 583 289 L 575 284 L 562 283 L 555 286 L 543 299 L 523 328 L 495 359 L 487 372 L 482 383 L 465 438 L 455 463 L 446 477 L 433 488 L 429 488 L 428 483 L 439 473 L 439 469 L 437 464 L 437 456 L 436 455 L 435 407 L 444 381 L 450 369 L 460 354 L 466 342 L 467 334 L 469 333 L 470 328 L 469 317 L 467 316 L 464 309 L 457 305 L 454 305 L 453 303 L 448 303 L 447 305 L 444 305 L 438 308 L 430 316 L 421 329 L 407 345 L 394 371 L 390 377 L 387 379 L 386 384 L 379 392 L 376 404 L 376 413 L 374 414 L 375 428 L 373 429 L 374 439 L 373 440 L 371 473 L 370 474 L 370 483 L 369 484 L 369 496 L 367 505 L 359 517 L 354 516 L 354 512 L 358 506 L 358 499 L 351 472 L 349 455 L 358 435 L 362 423 L 364 405 L 362 398 L 359 396 L 359 394 L 354 393 L 353 391 L 348 391 L 347 393 L 343 393 L 336 398 L 333 402 L 332 406 L 330 407 L 328 412 L 305 445 L 299 460 L 299 478 L 304 500 L 308 542 L 309 543 L 308 554 L 310 555 L 310 574 L 309 575 L 308 587 L 307 588 L 304 613 L 303 614 L 303 621 L 302 622 Q 345.5 835.5 559 792 Z");
+var SHUFFLE_RIGHT_HAND = new Path2D("M 1286 669 L 1286 661 L 1285 660 L 1282 636 L 1280 631 L 1278 618 L 1259 548 L 1258 527 L 1259 526 L 1259 513 L 1260 512 L 1260 500 L 1261 499 L 1261 480 L 1262 479 L 1262 463 L 1261 462 L 1262 443 L 1260 442 L 1259 431 L 1256 419 L 1252 409 L 1250 399 L 1247 392 L 1247 386 L 1244 379 L 1237 374 L 1226 374 L 1221 376 L 1218 379 L 1218 381 L 1215 383 L 1213 388 L 1212 404 L 1213 405 L 1213 413 L 1216 428 L 1216 436 L 1213 448 L 1209 491 L 1207 497 L 1207 501 L 1213 507 L 1213 511 L 1208 512 L 1195 501 L 1188 489 L 1182 465 L 1172 411 L 1166 391 L 1161 381 L 1145 356 L 1134 333 L 1116 306 L 1116 303 L 1102 289 L 1091 287 L 1090 289 L 1085 290 L 1078 296 L 1078 300 L 1076 301 L 1076 313 L 1078 314 L 1078 321 L 1081 327 L 1084 338 L 1090 353 L 1099 370 L 1099 372 L 1101 376 L 1103 377 L 1103 381 L 1110 398 L 1111 417 L 1112 418 L 1112 435 L 1113 436 L 1114 450 L 1117 460 L 1121 466 L 1124 468 L 1125 471 L 1124 476 L 1120 476 L 1108 465 L 1098 446 L 1096 439 L 1093 434 L 1071 367 L 1063 356 L 1051 344 L 1029 318 L 1019 302 L 1016 294 L 1014 293 L 1007 283 L 1002 279 L 996 277 L 986 277 L 974 282 L 972 284 L 970 292 L 968 295 L 969 306 L 973 318 L 984 337 L 1011 392 L 1012 396 L 1015 398 L 1015 402 L 1020 412 L 1024 431 L 1032 456 L 1040 475 L 1047 483 L 1046 488 L 1041 488 L 1028 484 L 1012 474 L 987 446 L 971 422 L 949 400 L 947 400 L 933 385 L 912 354 L 905 348 L 900 346 L 889 346 L 881 349 L 878 352 L 876 352 L 874 359 L 872 360 L 871 369 L 873 379 L 879 395 L 905 443 L 954 524 L 957 526 L 957 529 L 976 557 L 981 567 L 984 588 L 987 599 L 987 605 L 988 606 L 988 616 L 987 617 L 987 624 L 984 639 L 981 649 L 977 657 L 973 657 L 972 654 L 969 654 L 961 658 L 956 658 L 954 652 L 950 651 L 930 640 L 920 636 L 918 634 L 906 630 L 905 629 L 905 624 L 884 607 L 862 596 L 847 592 L 835 592 L 822 597 L 815 604 L 813 616 L 815 620 L 824 629 L 845 645 L 845 647 L 854 658 L 859 669 L 865 677 L 867 677 L 869 680 L 871 680 L 873 683 L 889 693 L 899 701 L 943 748 L 973 770 L 991 785 L 995 786 L 997 789 L 1009 797 L 1012 797 L 1016 801 L 1034 810 L 1036 810 L 1056 821 L 1059 821 L 1061 824 L 1063 824 Q 1252.0 858.0 1286 669 Z");
+var SH_LEFT_WC = { x: 430.5, y: 707.0 };
+var SH_RIGHT_WC = { x: 1174.5, y: 746.5 };
+var SH_HAND_SCALE_BASE = 0.26;
+var SH_FOREARM_W_BASE = 45;
+var SH_SHOULDER_DEPTH = 1.32;
+var SH_SKIN_FILL = '#d4a574';
+var SH_SKIN_SHADOW = 'rgba(0,0,0,0.25)';
+var SH_SHADOW_OFFSET = 4;
+
+function shGetScale(W) { return SH_HAND_SCALE_BASE * (W / 1200); }
+function shGetForearmW(W) { return SH_FOREARM_W_BASE * (W / 1200); }
+
+function shConstantSegment(c, from, to, width) {
+  var dx = to.x - from.x, dy = to.y - from.y;
+  var len = Math.max(1, Math.hypot(dx, dy));
+  var nx = -dy / len, ny = dx / len;
+  var hw = width / 2;
+  c.beginPath();
+  c.moveTo(from.x + nx * hw, from.y + ny * hw);
+  c.lineTo(to.x + nx * hw, to.y + ny * hw);
+  c.lineTo(to.x - nx * hw, to.y - ny * hw);
+  c.lineTo(from.x - nx * hw, from.y - ny * hw);
+  c.closePath();
+  c.fill();
+}
+
+function shGetElbow(shoulder, wrist, bendDir) {
+  var dx = wrist.x - shoulder.x, dy = wrist.y - shoulder.y;
+  var dist = Math.max(1, Math.hypot(dx, dy));
+  var mid = { x: (shoulder.x + wrist.x) / 2, y: (shoulder.y + wrist.y) / 2 };
+  var nx = -dy / dist, ny = dx / dist;
+  var elbowLift = Math.min(140, Math.max(18, dist * 0.22));
+  return { x: mid.x + nx * elbowLift * bendDir, y: mid.y + ny * elbowLift * bendDir };
+}
+
+function shDrawHandParts(c, wx, wy, index, W, H) {
+  var anchors = [{ xf: 0.22, side: -1 }, { xf: 0.78, side: 1 }];
+  var anchor = anchors[index % 2];
+  var shoulder = { x: W * anchor.xf, y: H * SH_SHOULDER_DEPTH };
+  var wrist = { x: wx, y: wy };
+  var elbow = shGetElbow(shoulder, wrist, anchor.side);
+  var fw = shGetForearmW(W);
+
+  shConstantSegment(c, shoulder, elbow, fw);
+  c.beginPath(); c.arc(shoulder.x, shoulder.y, fw / 2, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.arc(elbow.x, elbow.y, fw / 2, 0, Math.PI * 2); c.fill();
+  shConstantSegment(c, elbow, wrist, fw);
+  c.beginPath(); c.arc(wrist.x, wrist.y, fw / 2, 0, Math.PI * 2); c.fill();
+
+  var dx = wrist.x - elbow.x, dy = wrist.y - elbow.y;
+  var dir = Math.atan2(dy, dx);
+  var handPath = (index % 2 === 0) ? SHUFFLE_LEFT_HAND : SHUFFLE_RIGHT_HAND;
+  var wc = (index % 2 === 0) ? SH_LEFT_WC : SH_RIGHT_WC;
+  var sc = shGetScale(W);
+
+  c.save();
+  c.translate(wrist.x, wrist.y);
+  c.rotate(dir + Math.PI / 2);
+  c.scale(sc, sc);
+  c.translate(-wc.x, -wc.y);
+  c.fill(handPath);
+  c.restore();
+}
+
+function shDrawHand(c, wx, wy, index, W, H) {
+  c.save();
+  c.fillStyle = SH_SKIN_SHADOW;
+  c.save();
+  c.translate(SH_SHADOW_OFFSET, SH_SHADOW_OFFSET);
+  shDrawHandParts(c, wx, wy, index, W, H);
+  c.restore();
+  c.fillStyle = SH_SKIN_FILL;
+  shDrawHandParts(c, wx, wy, index, W, H);
+  c.restore();
+}
+
+// ═══ Physics shuffle state ═══
 var _shufflePhysicsActive = false;
 var _shufflePhysicsEngine = null;
 var _shufflePhysicsBodies = [];

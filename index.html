@@ -302,8 +302,24 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
-<!-- Floating chat bubble — persistent, always visible for secret handle -->
-<div id="chatBubble" style="display:none;position:fixed;bottom:14px;right:14px;width:44px;height:44px;border-radius:50%;background:rgba(59,130,246,0.8);border:2px solid rgba(255,255,255,0.3);z-index:1100;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.4);font-size:20px;line-height:44px;text-align:center;user-select:none;-webkit-tap-highlight-color:transparent;" onclick="claudeChatToggle()">💬</div>
+<!-- Floating chat bubble — purple, only shows after minimize from settings -->
+<div id="chatBubble" style="display:none;position:fixed;bottom:14px;right:14px;width:44px;height:44px;border-radius:50%;background:rgba(167,139,250,0.85);border:2px solid rgba(255,255,255,0.3);z-index:1100;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.4);font-size:20px;line-height:44px;text-align:center;user-select:none;-webkit-tap-highlight-color:transparent;" onclick="claudeChatOpenMini()">💬</div>
+
+<!-- Mini chat window — floating, compact -->
+<div id="chatMini" style="display:none;position:fixed;bottom:66px;right:10px;width:260px;height:220px;z-index:1100;background:rgba(15,10,30,0.95);border:1px solid rgba(167,139,250,0.4);border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.5);font-family:system-ui,sans-serif;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(167,139,250,0.2);border-bottom:1px solid rgba(167,139,250,0.2);">
+    <span style="color:rgba(167,139,250,0.9);font-size:11px;font-weight:700;">Chat</span>
+    <div>
+      <button onclick="claudeChatMaximize()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:14px;cursor:pointer;padding:2px 6px;">⬆</button>
+      <button onclick="claudeChatCloseMini()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:14px;cursor:pointer;padding:2px 6px;">✕</button>
+    </div>
+  </div>
+  <div id="chatMiniMessages" style="height:148px;overflow-y:auto;padding:6px 8px;font-size:11px;color:rgba(255,255,255,0.85);"></div>
+  <div style="display:flex;border-top:1px solid rgba(255,255,255,0.1);padding:4px;">
+    <input id="chatMiniInput" type="text" placeholder="Message..." autocomplete="off" style="flex:1;background:rgba(255,255,255,0.08);border:none;border-radius:6px;padding:5px 8px;color:#fff;font-size:11px;outline:none;">
+    <button onclick="claudeChatSendMini()" style="background:rgba(167,139,250,0.6);border:none;border-radius:6px;color:#fff;padding:5px 10px;margin-left:4px;font-size:10px;font-weight:700;cursor:pointer;">Send</button>
+  </div>
+</div>
 
 <!-- Boneyard Modal -->
 <div id="bonesBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,30,0,0.92);z-index:9999;overflow-y:auto;">
@@ -1137,7 +1153,7 @@ if ('serviceWorker' in navigator) {
 <script src="./assets/js/sfx.js" defer></script>
 <script src="./assets/js/game.js" defer></script>
 <script src="./assets/js/shuffle.js?v=9" defer></script>
-<script src="./assets/js/claude-chat.js?v=4" defer></script>
+<script src="./assets/js/claude-chat.js?v=5" defer></script>
 <script src="./assets/js/multiplayer.js" defer></script>
 <script src="./assets/js/ai-engine.js" defer></script>
 <script src="./assets/js/mp-social.js" defer></script>

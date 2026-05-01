@@ -86,16 +86,13 @@
         if (msg.type === 'chat') {
           const selfName = (typeof playerName !== 'undefined' && playerName) ? playerName : 'Player';
           const isSelf = msg.name && msg.name.toLowerCase() === selfName.toLowerCase();
-          // Skip own messages — already shown locally on send
           if (!isSelf) {
             claudeChatAddMessage(msg.name || 'Unknown', msg.text || '', false, false);
-            // Got a reply — stop retrying
+            ccAddMiniMessage(msg.name || 'Unknown', msg.text || '', false);
             ccClearPending();
           }
         }
-      } catch (e) {
-        // ignore non-JSON
-      }
+      } catch (e) {}
     };
 
     ccSocket.onclose = function() {
@@ -222,24 +219,141 @@
     return d.innerHTML;
   }
 
-  // ---- Show/hide floating bubble based on handle ----
-  function ccUpdateBubble() {
-    const bubble = document.getElementById('chatBubble');
-    if (!bubble) return;
+  // ---- Mini chat mode ----
+  let ccMinimized = false;
+
+  window.claudeChatOpenMini = function() {
+    document.getElementById('chatBubble').style.display = 'none';
+    document.getElementById('chatMini').style.display = 'block';
+    // Sync messages from main chat to mini
+    ccSyncMiniMessages();
+    // Ensure connected
     const name = (typeof playerName !== 'undefined' && playerName) ? playerName : '';
-    if (name.toLowerCase() === CC_ALLOWED_NAME) {
-      bubble.style.display = 'flex';
+    if (name.toLowerCase() === CC_ALLOWED_NAME && !ccConnected) claudeChatConnect();
+    // Focus input
+    const input = document.getElementById('chatMiniInput');
+    if (input) setTimeout(() => input.focus(), 100);
+  };
+
+  window.claudeChatCloseMini = function() {
+    document.getElementById('chatMini').style.display = 'none';
+    document.getElementById('chatBubble').style.display = 'flex';
+  };
+
+  window.claudeChatMaximize = function() {
+    document.getElementById('chatMini').style.display = 'none';
+    document.getElementById('chatBubble').style.display = 'none';
+    ccMinimized = false;
+    // Open full chat
+    const backdrop = document.getElementById('claudeChatBackdrop');
+    if (backdrop) backdrop.style.display = 'flex';
+    ccOpen = true;
+    const name = (typeof playerName !== 'undefined' && playerName) ? playerName : '';
+    if (name.toLowerCase() === CC_ALLOWED_NAME && !ccConnected) claudeChatConnect();
+  };
+
+  window.claudeChatSendMini = function() {
+    const input = document.getElementById('chatMiniInput');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    if (!ccSocket || ccSocket.readyState !== WebSocket.OPEN) return;
+    const name = (typeof playerName !== 'undefined' && playerName) ? playerName : 'Player';
+    const msgPayload = { type: 'chat', room: CC_ROOM, seat: 0, name: name, text: text, t: Date.now() };
+    ccSocket.send(JSON.stringify(msgPayload));
+    claudeChatAddMessage(name, text, true, false);
+    ccAddMiniMessage(name, text, true);
+    input.value = '';
+    input.focus();
+    // Retry logic
+    ccPendingMsg = msgPayload;
+    if (ccRetryTimer) clearInterval(ccRetryTimer);
+    ccRetryTimer = setInterval(function() {
+      if (!ccPendingMsg) { clearInterval(ccRetryTimer); ccRetryTimer = null; return; }
+      if (ccSocket && ccSocket.readyState === WebSocket.OPEN) ccSocket.send(JSON.stringify(ccPendingMsg));
+    }, 3000);
+  };
+
+  function ccAddMiniMessage(name, text, isSelf) {
+    const container = document.getElementById('chatMiniMessages');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.style.cssText = 'margin-bottom:4px;' + (isSelf ? 'text-align:right;' : '');
+    div.innerHTML = '<span style="color:' + (isSelf ? 'rgba(167,139,250,0.8)' : 'rgba(34,197,94,0.8)') + ';font-weight:600;font-size:10px;">' + name + '</span> <span style="color:rgba(255,255,255,0.8);">' + text.replace(/</g,'&lt;') + '</span>';
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function ccSyncMiniMessages() {
+    const mainMsgs = document.getElementById('claudeChatMessages');
+    const miniMsgs = document.getElementById('chatMiniMessages');
+    if (!mainMsgs || !miniMsgs) return;
+    miniMsgs.innerHTML = '';
+    // Copy last 20 messages
+    const msgs = mainMsgs.querySelectorAll('.claude-chat-msg');
+    const start = Math.max(0, msgs.length - 20);
+    for (let i = start; i < msgs.length; i++) {
+      const clone = msgs[i].cloneNode(true);
+      clone.style.fontSize = '10px';
+      miniMsgs.appendChild(clone);
+    }
+    miniMsgs.scrollTop = miniMsgs.scrollHeight;
+  }
+
+  // Override toggle to support minimize
+  const origToggle = window.claudeChatToggle;
+  window.claudeChatToggle = function() {
+    const backdrop = document.getElementById('claudeChatBackdrop');
+    if (backdrop && backdrop.style.display !== 'none') {
+      // Closing full chat — minimize to bubble
+      backdrop.style.display = 'none';
+      ccOpen = false;
+      ccMinimized = true;
+      document.getElementById('chatBubble').style.display = 'flex';
+      // Don't disconnect — keep alive for mini mode
     } else {
-      bubble.style.display = 'none';
+      // Opening full chat
+      if (backdrop) backdrop.style.display = 'flex';
+      ccOpen = true;
+      ccMinimized = false;
+      document.getElementById('chatBubble').style.display = 'none';
+      document.getElementById('chatMini').style.display = 'none';
+      const name = (typeof playerName !== 'undefined' && playerName) ? playerName : '';
+      if (name.toLowerCase() !== CC_ALLOWED_NAME) {
+        claudeChatAddMessage('System', 'Public chat is currently offline.', false, true);
+        ccUpdateStatus('disconnected');
+        return;
+      }
+      claudeChatConnect();
+      const input = document.getElementById('claudeChatInput');
+      if (input) setTimeout(() => input.focus(), 100);
+    }
+  };
+
+  // Also add received messages to mini chat
+  const origOnMessage = ccSocket ? ccSocket.onmessage : null;
+  function ccHookMiniMessages(msg) {
+    if (msg.type === 'chat') {
+      const selfName = (typeof playerName !== 'undefined' && playerName) ? playerName : 'Player';
+      const isSelf = msg.name && msg.name.toLowerCase() === selfName.toLowerCase();
+      if (!isSelf) {
+        ccAddMiniMessage(msg.name || 'Unknown', msg.text || '', false);
+      }
     }
   }
 
-  // Check bubble visibility periodically (player name can change)
-  setInterval(ccUpdateBubble, 2000);
+  // Mini input enter key
+  document.addEventListener('DOMContentLoaded', function() {
+    const miniInput = document.getElementById('chatMiniInput');
+    if (miniInput) {
+      miniInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); claudeChatSendMini(); }
+      });
+    }
+  });
 
   // ---- Event Listeners ----
   document.addEventListener('DOMContentLoaded', function() {
-    ccUpdateBubble();
     const closeBtn = document.getElementById('claudeChatCloseBtn');
     if (closeBtn) {
       closeBtn.addEventListener('click', function() {

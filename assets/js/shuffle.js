@@ -240,9 +240,8 @@ function _autoMixAI() {
   if (allRecs.length > 0) {
     var rec = allRecs[Math.floor(Math.random() * allRecs.length)];
     _playRecording(rec, cx, cy, r, ptr);
-  } else {
-    _proceduralMix(cx, cy, r, ptr);
   }
+  // No fallback — if no recordings, timeout will end the shuffle
 }
 
 function _playRecording(rec, cx, cy, r, ptr) {

@@ -3,7 +3,11 @@
 // Extracted from index.html v13.3.0
 // ============================================================
 
-const GAME_VERSION = 'v13.5.DEV.1'; // Update each release — used by splash & about screens
+const GAME_VERSION = 'v13.5.DEV.2'; // Update each release — used by splash & about screens
+
+// Deal mode: 'auto' (instant) or 'shuffle' (physics shuffle + pick)
+var dealMode = 'shuffle';
+try { var _dm = localStorage.getItem('txdom_dealMode'); if (_dm) dealMode = _dm; } catch(e) {}
 
 // ============================================================
 // Lazy Load Helper — loads JS modules on demand
@@ -9513,46 +9517,79 @@ async function startNewHand(){
 
   createPlaceholders();
 
-  const hands = session.game.hands;
+  if (dealMode === 'shuffle' && typeof performShuffleAnimation === 'function') {
+    // ── SHUFFLE & PICK MODE ──
+    // Create all tiles as sprites in a center pile, run physics shuffle, then pick
+    const allTiles = [];
+    const hands = session.game.hands;
+    for (let p = 0; p < session.game.player_count; p++) {
+      for (let h = 0; h < session.game.hand_size; h++) {
+        if (hands[p][h]) allTiles.push(hands[p][h]);
+      }
+    }
 
-  for(let p = 0; p < session.game.player_count; p++){
-    sprites[p] = [];
-    const playerNum = seatToPlayer(p);  // Convert seat to player number for layout
-    for(let h = 0; h < session.game.hand_size; h++){
-      const tile = hands[p][h];
-      if(!tile) continue;
+    // Create sprites for all tiles (face-down, in center pile)
+    const rect = document.getElementById('gameWrapper').getBoundingClientRect();
+    const cx = rect.width * 0.5;
+    const cy = rect.height * 0.5;
+    const SP = typeof SHUFFLE_PHYSICS !== 'undefined' ? SHUFFLE_PHYSICS : {};
+    const areaR = rect.height * (SP.areaRadius || 0.37);
 
+    sprites[0] = [];
+    _shufflePickPool = [];
+    for (let i = 0; i < allTiles.length; i++) {
+      const tile = allTiles[i];
       const sprite = makeSprite(tile);
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * areaR * 0.6;
+      const px = cx + Math.cos(angle) * dist - 28;
+      const py = cy + Math.sin(angle) * dist - 56;
+      sprite.setPose({ x: px, y: py, s: SP.tileScale || 0.35, rz: Math.random() * 360, ry: 0 });
+      sprite.setFaceUp(false);
+      if (sprite._shadow) shadowLayer.appendChild(sprite._shadow);
+      spriteLayer.appendChild(sprite);
+      const data = { sprite, tile, originalSlot: i };
+      sprites[0].push(data);
+      _shufflePickPool.push({ sprite, tile, data, picked: false });
+    }
 
-      const pos = getHandPosition(playerNum, h);
-      if(pos){
-        sprite.setPose(pos);
-        if(sprite._shadow){
-          shadowLayer.appendChild(sprite._shadow);
-        }
-        spriteLayer.appendChild(sprite);
+    // Run physics shuffle with hands
+    await performShuffleAnimation();
 
-        const data = { sprite, tile, originalSlot: h };
-        sprites[p][h] = data;
+    // After shuffle: pick phase — rebuild sprites into proper seats
+    await _runPickPhase();
 
-        if(p === 0 || (PASS_AND_PLAY_MODE && ppIsHuman(p))){
-          // Pass sprite element directly so click handler finds current position after sorting
-          sprite.addEventListener('click', () => handlePlayer1Click(sprite));
-          // Mobile touch support - use touchstart for immediate response
-          sprite.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handlePlayer1Click(sprite);
-          }, { passive: false });
+  } else {
+    // ── AUTO DEAL MODE (original) ──
+    const hands = session.game.hands;
+    for(let p = 0; p < session.game.player_count; p++){
+      sprites[p] = [];
+      const playerNum = seatToPlayer(p);
+      for(let h = 0; h < session.game.hand_size; h++){
+        const tile = hands[p][h];
+        if(!tile) continue;
+        const sprite = makeSprite(tile);
+        const pos = getHandPosition(playerNum, h);
+        if(pos){
+          sprite.setPose(pos);
+          if(sprite._shadow) shadowLayer.appendChild(sprite._shadow);
+          spriteLayer.appendChild(sprite);
+          const data = { sprite, tile, originalSlot: h };
+          sprites[p][h] = data;
+          if(p === 0 || (PASS_AND_PLAY_MODE && ppIsHuman(p))){
+            sprite.addEventListener('click', () => handlePlayer1Click(sprite));
+            sprite.addEventListener('touchstart', (e) => {
+              e.preventDefault(); e.stopPropagation();
+              handlePlayer1Click(sprite);
+            }, { passive: false });
+          }
         }
       }
     }
-  }
-
-  // Auto deal: just flip local player's tiles face-up
-  const localSeat = getLocalSeat();
-  for (const data of (sprites[localSeat] || [])) {
-    if (data && data.sprite) data.sprite.setFaceUp(true);
+    const localSeat = getLocalSeat();
+    for (const data of (sprites[localSeat] || [])) {
+      if (data && data.sprite) data.sprite.setFaceUp(true);
+    }
   }
 
   team1Score = session.game.team_points[0];

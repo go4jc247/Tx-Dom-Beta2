@@ -1006,9 +1006,9 @@ function _endShufflePhysics() {
     _shufflePhysicsEngine = null;
   }
   _shufflePhysicsBodies = [];
+}
 
-  // Restore shadows — but do NOT reset sprite positions (arrange animation already placed them)
-
+async function _runPickPhase() {
   const localSeat = getLocalSeat();
   const playerCount = session.game.player_count;
   const handSize = session.game.hand_size;
@@ -1362,4 +1362,5 @@ function _endShufflePhysics() {
     py += H * yOff;
     return { x: px, y: py };
   }
-
+}
+}

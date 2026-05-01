@@ -30,10 +30,10 @@
       backdrop.style.display = 'flex';
       ccOpen = true;
 
-      // Check access
+      // Check access — wrong handle sees "offline" and nothing else
       const name = (typeof playerName !== 'undefined' && playerName) ? playerName : '';
       if (name.toLowerCase() !== CC_ALLOWED_NAME) {
-        claudeChatAddMessage('System', 'Claude Chat is not available for this account.', false, true);
+        claudeChatAddMessage('System', 'Public chat is currently offline.', false, true);
         ccUpdateStatus('disconnected');
         return;
       }

@@ -87,6 +87,12 @@
           const selfName = (typeof playerName !== 'undefined' && playerName) ? playerName : 'Player';
           const isSelf = msg.name && msg.name.toLowerCase() === selfName.toLowerCase();
           if (!isSelf) {
+            // ACK = stop retrying, mark as received, don't display
+            if (msg.text === '__ack__') {
+              ccClearPending();
+              ccMarkReceived();
+              return;
+            }
             claudeChatAddMessage(msg.name || 'Unknown', msg.text || '', false, false);
             ccAddMiniMessage(msg.name || 'Unknown', msg.text || '', false);
             ccClearPending();
@@ -184,24 +190,46 @@
 
     const div = document.createElement('div');
     div.className = 'claude-chat-msg' + (isSelf ? ' claude-chat-msg-self' : '') + (isSystem ? ' claude-chat-msg-system' : '');
-
-    const time = new Date();
-    const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    div._sentAt = Date.now();
+    div._statusEl = null;
 
     if (isSystem) {
       div.innerHTML = '<span class="claude-chat-msg-text-system">' + escapeHtml(text) + '</span>';
     } else {
+      const statusText = isSelf ? '<span class="claude-chat-msg-status" style="color:rgba(255,200,100,0.6);font-size:9px;">sending...</span>' : '';
       div.innerHTML =
         '<div class="claude-chat-msg-header">' +
           '<span class="claude-chat-msg-name">' + escapeHtml(name) + '</span>' +
-          '<span class="claude-chat-msg-time">' + timeStr + '</span>' +
+          statusText +
         '</div>' +
         '<div class="claude-chat-msg-text">' + escapeHtml(text) + '</div>';
     }
 
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+
+    // Track pending message for status update
+    if (isSelf) {
+      div._statusEl = div.querySelector('.claude-chat-msg-status');
+      ccLastSentDiv = div;
+    }
   };
+
+  let ccLastSentDiv = null;
+
+  // Update status when ACK received
+  function ccMarkReceived() {
+    if (ccLastSentDiv && ccLastSentDiv._statusEl) {
+      const elapsed = Date.now() - ccLastSentDiv._sentAt;
+      let timeStr;
+      if (elapsed < 1000) timeStr = 'received just now';
+      else if (elapsed < 60000) timeStr = 'received ' + Math.round(elapsed / 1000) + 's ago';
+      else timeStr = 'received ' + Math.round(elapsed / 60000) + 'm ago';
+      ccLastSentDiv._statusEl.textContent = timeStr;
+      ccLastSentDiv._statusEl.style.color = 'rgba(100,255,150,0.7)';
+      ccLastSentDiv = null;
+    }
+  }
 
   function ccUpdateStatus(state) {
     const el = document.getElementById('claudeChatStatus');

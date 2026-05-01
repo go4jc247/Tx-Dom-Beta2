@@ -1253,6 +1253,23 @@ async function _runPickPhase() {
   });
   tableEl.appendChild(speedBtn);
 
+  // Auto-select button — persistent via localStorage
+  var _autoSelectPick = false;
+  try { _autoSelectPick = localStorage.getItem('txdom_autoSelectPick') === 'true'; } catch(e) {}
+  var autoSelBtn = document.createElement('button');
+  autoSelBtn.id = 'pickAutoSelBtn';
+  autoSelBtn.textContent = 'AUTO';
+  var _autoSelActive = _autoSelectPick;
+  autoSelBtn.style.cssText = 'position:absolute;bottom:8px;left:56px;z-index:610;height:40px;padding:0 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.3);background:' + (_autoSelActive ? 'rgba(59,130,246,0.5)' : 'rgba(0,0,0,0.5)') + ';color:' + (_autoSelActive ? '#fff' : 'rgba(255,255,255,0.7)') + ';font-size:11px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;';
+  autoSelBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    _autoSelectPick = !_autoSelectPick;
+    try { localStorage.setItem('txdom_autoSelectPick', _autoSelectPick ? 'true' : 'false'); } catch(e) {}
+    autoSelBtn.style.background = _autoSelectPick ? 'rgba(59,130,246,0.5)' : 'rgba(0,0,0,0.5)';
+    autoSelBtn.style.color = _autoSelectPick ? '#fff' : 'rgba(255,255,255,0.7)';
+  });
+  tableEl.appendChild(autoSelBtn);
+
   // Gear button to toggle pile adjustment menu
   var pileGearBtn = document.createElement('button');
   pileGearBtn.id = 'pileGearBtn';
@@ -1732,6 +1749,29 @@ async function _runPickPhase() {
   }
 
   function playerPickPhase() {
+    // If auto-select is on, pick randomly like AI
+    if (_autoSelectPick) {
+      return new Promise(function(resolve) {
+        hint.textContent = 'Auto-selecting your dominoes...';
+        counter.textContent = '0 / ' + handSize;
+        var autoPicked = 0;
+        function autoPickOne() {
+          if (autoPicked >= handSize) { resolve(); return; }
+          var available = [];
+          for (var i = 0; i < pool.length; i++) {
+            if (!pool[i].picked && pool[i]._body && !pool[i]._body.isStatic) available.push(pool[i]);
+          }
+          if (available.length === 0) { resolve(); return; }
+          var entry = available[Math.floor(Math.random() * available.length)];
+          pickTileForPlayer(entry);
+          autoPicked++;
+          counter.textContent = autoPicked + ' / ' + handSize;
+          setTimeout(autoPickOne, _pickSpeedUp ? 50 : 200);
+        }
+        setTimeout(autoPickOne, 300);
+      });
+    }
+
     return new Promise(function(resolve) {
       // Don't overwrite hint if it was already set by the group label
       if (!hint.textContent || hint.textContent.indexOf('slide') < 0) {

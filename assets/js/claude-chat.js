@@ -222,8 +222,24 @@
     return d.innerHTML;
   }
 
+  // ---- Show/hide floating bubble based on handle ----
+  function ccUpdateBubble() {
+    const bubble = document.getElementById('chatBubble');
+    if (!bubble) return;
+    const name = (typeof playerName !== 'undefined' && playerName) ? playerName : '';
+    if (name.toLowerCase() === CC_ALLOWED_NAME) {
+      bubble.style.display = 'flex';
+    } else {
+      bubble.style.display = 'none';
+    }
+  }
+
+  // Check bubble visibility periodically (player name can change)
+  setInterval(ccUpdateBubble, 2000);
+
   // ---- Event Listeners ----
   document.addEventListener('DOMContentLoaded', function() {
+    ccUpdateBubble();
     const closeBtn = document.getElementById('claudeChatCloseBtn');
     if (closeBtn) {
       closeBtn.addEventListener('click', function() {

@@ -115,19 +115,15 @@ async function performShuffleAnimation() {
     _shufflePhysicsResolve = resolve;
     _startShufflePhysics();
 
-    // V13.1: If it's AI's turn to shuffle, auto-mix then auto-end
-    var shufflerSeat = session.dealer;
-    var localSeat = typeof getLocalSeat === 'function' ? getLocalSeat() : 0;
-    if (shufflerSeat !== localSeat) {
-      _autoMixAI();
-    }
+    // Always auto-mix (AI shuffles for all players in this version)
+    _autoMixAI();
 
-    // Auto-end shuffle after 8 seconds (extended for hand tuning)
+    // Auto-end shuffle after 4 seconds
     setTimeout(function() {
       if (_shufflePhysicsActive && _shufflePhysicsResolve) {
         _endShuffleForPick();
       }
-    }, 8000);
+    }, 4000);
   });
 }
 

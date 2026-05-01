@@ -381,6 +381,7 @@ function _playRecording(rec, cx, cy, r, ptr) {
 
 function _proceduralMix(cx, cy, r, ptr) {
   // Fallback: simple spiral pattern
+  _sandboxPlaybackActive = true;
   var elapsed = 0, duration = 15000, interval = 16;
   var angle = Math.random() * Math.PI * 2;
   var prevX = cx, prevY = cy;

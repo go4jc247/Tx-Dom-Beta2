@@ -304,7 +304,7 @@ if ('serviceWorker' in navigator) {
 </div>
 
 <!-- Floating chat bubble — purple, only shows after minimize from settings -->
-<div id="chatBubble" style="display:none;position:fixed;bottom:14px;right:14px;width:44px;height:44px;border-radius:50%;background:rgba(167,139,250,0.85);border:2px solid rgba(255,255,255,0.3);z-index:99990;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.4);font-size:20px;line-height:44px;text-align:center;user-select:none;-webkit-tap-highlight-color:transparent;" onclick="claudeChatOpenMini()">💬</div>
+<div id="chatBubble" style="display:none;position:fixed;bottom:14px;right:14px;width:44px;height:44px;border-radius:50%;background:rgba(167,139,250,0.85);border:2px solid rgba(255,255,255,0.3);z-index:99990;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.4);font-size:20px;line-height:44px;text-align:center;user-select:none;-webkit-tap-highlight-color:transparent;" onclick="claudeChatOpenMini()">💬<span id="chatBubbleBadge" style="display:none;position:absolute;top:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:#ef4444;border:2px solid rgba(15,10,30,0.9);font-size:9px;line-height:16px;text-align:center;color:#fff;font-weight:700;">!</span></div>
 
 <!-- Mini chat window — floating, compact -->
 <div id="chatMini" style="display:none;position:fixed;bottom:66px;right:10px;width:260px;height:220px;z-index:99990;background:rgba(15,10,30,0.95);border:1px solid rgba(167,139,250,0.4);border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.5);font-family:system-ui,sans-serif;">
@@ -1154,7 +1154,7 @@ if ('serviceWorker' in navigator) {
 <script src="./assets/js/sfx.js" defer></script>
 <script src="./assets/js/game.js" defer></script>
 <script src="./assets/js/shuffle.js?v=9" defer></script>
-<script src="./assets/js/claude-chat.js?v=9" defer></script>
+<script src="./assets/js/claude-chat.js?v=10" defer></script>
 <script src="./assets/js/multiplayer.js" defer></script>
 <script src="./assets/js/ai-engine.js" defer></script>
 <script src="./assets/js/mp-social.js" defer></script>

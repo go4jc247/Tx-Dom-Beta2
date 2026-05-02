@@ -139,6 +139,8 @@
             claudeChatAddMessage(msg.name || 'Unknown', msg.text || '', false, false);
             ccAddMiniMessage(msg.name || 'Unknown', msg.text || '', false);
             ccClearPending();
+            // Show badge if chat is minimized (bubble visible)
+            ccShowBadge();
           }
         }
       } catch (e) {}
@@ -301,6 +303,7 @@
   window.claudeChatOpenMini = function() {
     document.getElementById('chatBubble').style.display = 'none';
     document.getElementById('chatMini').style.display = 'block';
+    ccHideBadge();
     // Sync messages from main chat to mini
     ccSyncMiniMessages();
     // Ensure connected
@@ -427,6 +430,19 @@
       });
     }
   });
+
+  // ---- Notification badge ----
+  function ccShowBadge() {
+    const badge = document.getElementById('chatBubbleBadge');
+    const bubble = document.getElementById('chatBubble');
+    if (badge && bubble && bubble.style.display === 'flex') {
+      badge.style.display = 'block';
+    }
+  }
+  function ccHideBadge() {
+    const badge = document.getElementById('chatBubbleBadge');
+    if (badge) badge.style.display = 'none';
+  }
 
   // ---- Auto-show bubble for secret handle ----
   function ccShowBubbleIfAllowed() {

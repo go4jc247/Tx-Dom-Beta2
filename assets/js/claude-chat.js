@@ -458,6 +458,11 @@
   function ccShowBubbleIfAllowed() {
     const name = (typeof playerName !== 'undefined' && playerName) ? playerName : '';
     const bubble = document.getElementById('chatBubble');
+    const backdrop = document.getElementById('claudeChatBackdrop');
+    const mini = document.getElementById('chatMini');
+    // Don't show bubble if full chat or mini chat is already open
+    if (backdrop && backdrop.style.display !== 'none') return;
+    if (mini && mini.style.display !== 'none') return;
     if (bubble && name.toLowerCase() === CC_ALLOWED_NAME) {
       bubble.style.display = 'flex';
     }

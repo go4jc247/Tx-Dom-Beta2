@@ -322,11 +322,15 @@
   window.claudeChatMaximize = function() {
     document.getElementById('chatMini').style.display = 'none';
     document.getElementById('chatBubble').style.display = 'none';
+    ccHideBadge();
     ccMinimized = false;
     // Open full chat
     const backdrop = document.getElementById('claudeChatBackdrop');
     if (backdrop) backdrop.style.display = 'flex';
     ccOpen = true;
+    // Restore history if empty
+    const container = document.getElementById('claudeChatMessages');
+    if (container && container.children.length === 0) ccRestoreHistory();
     const name = (typeof playerName !== 'undefined' && playerName) ? playerName : '';
     if (name.toLowerCase() === CC_ALLOWED_NAME && !ccConnected) claudeChatConnect();
   };
@@ -397,6 +401,12 @@
       ccMinimized = false;
       document.getElementById('chatBubble').style.display = 'none';
       document.getElementById('chatMini').style.display = 'none';
+      ccHideBadge();
+      // Restore history if chat is empty
+      const container = document.getElementById('claudeChatMessages');
+      if (container && container.children.length === 0) {
+        ccRestoreHistory();
+      }
       const name = (typeof playerName !== 'undefined' && playerName) ? playerName : '';
       if (name.toLowerCase() !== CC_ALLOWED_NAME) {
         claudeChatAddMessage('System', 'Public chat is currently offline.', false, true);

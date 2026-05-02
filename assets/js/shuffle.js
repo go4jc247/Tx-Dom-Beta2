@@ -2079,10 +2079,9 @@ async function _runPickPhase() {
   var aiOpponents = opponentSeats.filter(function(s) { return s !== localSeat; });
   if (localIsOpponent) {
     hint.textContent = 'Your team picks — slide ' + handSize + ' dominoes';
-    await Promise.all([
-      playerPickPhase(),
-      aiGroupPick(aiOpponents, '')  // empty label — player hint takes priority
-    ]);
+    // Player picks first, then AI picks (prevents speed-up from stealing player's tiles)
+    await playerPickPhase();
+    if (aiOpponents.length > 0) await aiGroupPick(aiOpponents, '');
   } else {
     await aiGroupPick(opponentSeats, 'Opponents picking...');
   }
@@ -2091,10 +2090,9 @@ async function _runPickPhase() {
   var aiPartners = partnerSeats.filter(function(s) { return s !== localSeat; });
   if (localIsPartner) {
     hint.textContent = 'Your turn — slide ' + handSize + ' dominoes';
-    await Promise.all([
-      playerPickPhase(),
-      aiGroupPick(aiPartners, '')  // empty label — player hint takes priority
-    ]);
+    // Player picks first, then AI picks
+    await playerPickPhase();
+    if (aiPartners.length > 0) await aiGroupPick(aiPartners, '');
   } else if (partnerSeats.length > 0) {
     await aiGroupPick(partnerSeats, 'Partner(s) picking...');
   }

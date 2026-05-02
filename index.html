@@ -292,6 +292,7 @@ if ('serviceWorker' in navigator) {
           <span class="claude-chat-status-text">Disconnected</span>
         </span>
       </div>
+      <button onclick="claudeChatToggle()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:16px;cursor:pointer;padding:4px 8px;" title="Minimize">⬇</button>
       <button id="claudeChatCloseBtn" class="claude-chat-close-btn">&times;</button>
     </div>
     <div id="claudeChatMessages" class="claude-chat-messages"></div>
@@ -1153,7 +1154,7 @@ if ('serviceWorker' in navigator) {
 <script src="./assets/js/sfx.js" defer></script>
 <script src="./assets/js/game.js" defer></script>
 <script src="./assets/js/shuffle.js?v=9" defer></script>
-<script src="./assets/js/claude-chat.js?v=8" defer></script>
+<script src="./assets/js/claude-chat.js?v=9" defer></script>
 <script src="./assets/js/multiplayer.js" defer></script>
 <script src="./assets/js/ai-engine.js" defer></script>
 <script src="./assets/js/mp-social.js" defer></script>

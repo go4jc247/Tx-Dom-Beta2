@@ -9,6 +9,44 @@
   const CC_ROOM = 'Moonroom004';
   const CC_ALLOWED_NAME = 'johnjohn';
   const CC_HEARTBEAT_MS = 15000;
+  const CC_HISTORY_KEY = 'txdom_chatHistory';
+  const CC_MAX_HISTORY = 50;
+
+  // Load chat history from localStorage
+  function ccLoadHistory() {
+    try {
+      const raw = localStorage.getItem(CC_HISTORY_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch(e) { return []; }
+  }
+
+  // Save a message to history
+  function ccSaveToHistory(name, text, isSelf) {
+    try {
+      const history = ccLoadHistory();
+      history.push({ name, text, isSelf, t: Date.now() });
+      if (history.length > CC_MAX_HISTORY) history.splice(0, history.length - CC_MAX_HISTORY);
+      localStorage.setItem(CC_HISTORY_KEY, JSON.stringify(history));
+    } catch(e) {}
+  }
+
+  // Restore chat history into the chat container
+  function ccRestoreHistory() {
+    const container = document.getElementById('claudeChatMessages');
+    if (!container) return;
+    const history = ccLoadHistory();
+    for (const msg of history) {
+      const div = document.createElement('div');
+      div.className = 'claude-chat-msg' + (msg.isSelf ? ' claude-chat-msg-self' : '');
+      div.innerHTML =
+        '<div class="claude-chat-msg-header">' +
+          '<span class="claude-chat-msg-name">' + escapeHtml(msg.name) + '</span>' +
+        '</div>' +
+        '<div class="claude-chat-msg-text">' + escapeHtml(msg.text) + '</div>';
+      container.appendChild(div);
+    }
+    container.scrollTop = container.scrollHeight;
+  }
 
   let ccSocket = null;
   let ccConnected = false;
@@ -36,6 +74,11 @@
         claudeChatAddMessage('System', 'Public chat is currently offline.', false, true);
         ccUpdateStatus('disconnected');
         return;
+      }
+      // Restore history if chat is empty
+      const container = document.getElementById('claudeChatMessages');
+      if (container && container.children.length === 0) {
+        ccRestoreHistory();
       }
       claudeChatConnect();
       // Focus input
@@ -207,6 +250,11 @@
 
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+
+    // Save to localStorage (skip system messages)
+    if (!isSystem) {
+      ccSaveToHistory(name, text, isSelf);
+    }
 
     // Track pending message for status update
     if (isSelf) {

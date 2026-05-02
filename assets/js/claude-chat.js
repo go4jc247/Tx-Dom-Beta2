@@ -185,12 +185,54 @@
   let ccRetryTimer = null;
   let ccPendingMsg = null;
 
+  // Game state debug info
+  function ccGetGameStatus() {
+    try {
+      const info = [];
+      info.push('GAME STATE:');
+      info.push('Mode: ' + (typeof GAME_MODE !== 'undefined' ? GAME_MODE : 'unknown'));
+      info.push('Phase: ' + (typeof gamePhase !== 'undefined' ? gamePhase : 'unknown'));
+      info.push('Trick: ' + (typeof currentTrick !== 'undefined' ? currentTrick : '?'));
+      info.push('Animating: ' + (typeof isAnimating !== 'undefined' ? isAnimating : '?'));
+      info.push('WaitingP1: ' + (typeof waitingForPlayer1 !== 'undefined' ? waitingForPlayer1 : '?'));
+      info.push('Dealer: ' + (typeof session !== 'undefined' && session ? session.dealer : '?'));
+      info.push('Trump: ' + (typeof session !== 'undefined' && session && session.game ? session.game.trump : '?'));
+      info.push('Bid: ' + (typeof session !== 'undefined' && session && session.game ? session.game.bid : '?'));
+      info.push('Bidder: ' + (typeof session !== 'undefined' && session && session.game ? session.game.bidder : '?'));
+      info.push('Score: ' + (typeof team1Score !== 'undefined' ? team1Score + ' vs ' + team2Score : '?'));
+      info.push('Marks: ' + (typeof team1Marks !== 'undefined' ? team1Marks + ' vs ' + team2Marks : '?'));
+      info.push('Shuffle: ' + (typeof _shufflePhysicsActive !== 'undefined' ? _shufflePhysicsActive : '?'));
+      info.push('DealMode: ' + (typeof dealMode !== 'undefined' ? dealMode : '?'));
+      if (typeof biddingState !== 'undefined' && biddingState) {
+        info.push('BidPhase: ' + (biddingState.phase || '?'));
+        info.push('CurrentBidder: ' + (biddingState.currentBidder !== undefined ? biddingState.currentBidder : '?'));
+      }
+      if (typeof sprites !== 'undefined') {
+        info.push('Sprites: ' + sprites.length + ' seats, P0=' + (sprites[0] ? sprites[0].length : 0) + ' tiles');
+      }
+      return info.join('\n');
+    } catch(e) {
+      return 'Error getting status: ' + e.message;
+    }
+  }
+
   window.claudeChatSend = function() {
     const input = document.getElementById('claudeChatInput');
     if (!input) return;
-    const text = input.value.trim();
+    let text = input.value.trim();
     if (!text) return;
     if (!ccSocket || ccSocket.readyState !== WebSocket.OPEN) return;
+
+    // Special command: !status appends game state
+    if (text === '!status' || text.startsWith('!status ')) {
+      const userMsg = text.replace('!status', '').trim();
+      text = (userMsg ? userMsg + '\n\n' : '') + ccGetGameStatus();
+    }
+    // Special command: !bug prepends BUG REPORT and adds state
+    if (text.startsWith('!bug ')) {
+      const bugMsg = text.replace('!bug ', '').trim();
+      text = 'BUG REPORT: ' + bugMsg + '\n\n' + ccGetGameStatus();
+    }
 
     const name = (typeof playerName !== 'undefined' && playerName) ? playerName : 'Player';
     const msgPayload = {

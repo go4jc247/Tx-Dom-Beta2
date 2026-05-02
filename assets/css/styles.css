@@ -1882,6 +1882,7 @@
   color: #e2e8f0;
   line-height: 1.4;
   word-wrap: break-word;
+  white-space: pre-wrap;
 }
 .claude-chat-msg-text-system {
   font-size: 12px;

@@ -179,11 +179,121 @@ var SHUFFLE_PHYSICS = {
 async function performShuffleAnimation() {
   // This is now a physics-driven interactive shuffle
   // Returns a promise that resolves when player clicks "Done" or gather completes
+  var localSeat = getLocalSeat();
+  var isLocalShuffler = (localSeat === session.dealer);
+  var autoOn = false;
+  try { autoOn = localStorage.getItem('txdom_autoSelectPick') === 'true'; } catch(e) {}
+
+  if (isLocalShuffler && !autoOn) {
+    // ── MANUAL SHUFFLE MODE ──
+    // Player shuffles with their fingers. Must displace 80% of tiles + 5s minimum.
+    return new Promise(function(resolve) {
+      _shufflePhysicsResolve = resolve;
+      _startShufflePhysics();
+
+      // Track which tiles have been displaced from center
+      var totalTiles = _shufflePhysicsBodies.length;
+      var displacedSet = {};  // bodyId -> true once it leaves center
+      var ac = _shuffleAreaCenter;
+      var displacedThreshold = Math.floor(totalTiles * 0.8);
+      var startTime = performance.now();
+      var MIN_TIME = 5000;
+      var MIN_FINGER_SPEED = 3; // pixels per frame minimum to count as mixing
+      var shuffleValidated = false;
+
+      // Show hint
+      var hintEl = document.getElementById('shuffleHint');
+      if (hintEl) hintEl.textContent = 'Your turn to shuffle!';
+
+      // Create progress indicator
+      var progEl = document.createElement('div');
+      progEl.id = 'shuffleProgress';
+      progEl.style.cssText = 'position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:510;color:rgba(255,255,255,0.8);font-size:12px;font-weight:600;font-family:system-ui,sans-serif;text-align:center;pointer-events:none;';
+      progEl.textContent = '0% mixed';
+      var tableEl = document.getElementById('gameWrapper');
+      if (tableEl) tableEl.appendChild(progEl);
+
+      // Create Done button (hidden until validated)
+      var doneBtn = document.createElement('button');
+      doneBtn.id = 'shuffleDoneBtn';
+      doneBtn.textContent = 'Done';
+      doneBtn.style.cssText = 'position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:610;padding:10px 32px;border-radius:20px;border:1px solid rgba(255,255,255,0.4);background:rgba(59,130,246,0.6);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;display:none;';
+      doneBtn.addEventListener('click', function() {
+        clearInterval(checkTimer);
+        if (progEl) progEl.remove();
+        doneBtn.remove();
+        _endShuffleForPick();
+      });
+      if (tableEl) tableEl.appendChild(doneBtn);
+
+      // Check displacement every 200ms
+      var checkTimer = setInterval(function() {
+        if (!_shufflePhysicsActive) { clearInterval(checkTimer); return; }
+
+        // Check finger speed — only count mixing if finger is moving fast enough
+        var hasSpeed = false;
+        var touchKeys = Object.keys(_shuffleTouchPointers);
+        for (var tk = 0; tk < touchKeys.length; tk++) {
+          var tp = _shuffleTouchPointers[touchKeys[tk]];
+          if (tp) {
+            var spd = Math.sqrt(tp.vx * tp.vx + tp.vy * tp.vy);
+            if (spd >= MIN_FINGER_SPEED) hasSpeed = true;
+          }
+        }
+        // Also check mouse pointer
+        var ptr = _shufflePhysicsPointer;
+        if (ptr.active) {
+          var mspd = Math.sqrt(ptr.vx * ptr.vx + ptr.vy * ptr.vy);
+          if (mspd >= MIN_FINGER_SPEED) hasSpeed = true;
+        }
+
+        // Track tiles that have left the center area
+        var centerR = ac.r * 0.5; // "center" = inner 50% of area
+        for (var bi = 0; bi < _shufflePhysicsBodies.length; bi++) {
+          var body = _shufflePhysicsBodies[bi];
+          if (body.isStatic) continue;
+          var dx = body.position.x - ac.x;
+          var dy = body.position.y - ac.y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > centerR) {
+            displacedSet[body.id] = true;
+          }
+        }
+
+        var displacedCount = Object.keys(displacedSet).length;
+        var pct = Math.min(100, Math.round((displacedCount / displacedThreshold) * 100));
+        var elapsed = performance.now() - startTime;
+
+        if (progEl) {
+          progEl.textContent = pct + '% mixed' + (elapsed < MIN_TIME ? ' (' + Math.ceil((MIN_TIME - elapsed) / 1000) + 's)' : '');
+        }
+
+        // Validate: 80% displaced AND 5 seconds elapsed
+        if (displacedCount >= displacedThreshold && elapsed >= MIN_TIME && !shuffleValidated) {
+          shuffleValidated = true;
+          doneBtn.style.display = 'block';
+          if (progEl) progEl.textContent = 'Ready! Tap Done';
+          if (hintEl) hintEl.textContent = '';
+        }
+      }, 200);
+
+      // Safety timeout — auto-end after 30 seconds regardless
+      setTimeout(function() {
+        if (_shufflePhysicsActive && _shufflePhysicsResolve) {
+          clearInterval(checkTimer);
+          if (progEl) progEl.remove();
+          doneBtn.remove();
+          _endShuffleForPick();
+        }
+      }, 30000);
+    });
+  }
+
+  // ── AUTO SHUFFLE (AI mixes) ──
   return new Promise(function(resolve) {
     _shufflePhysicsResolve = resolve;
     _startShufflePhysics();
 
-    // Always auto-mix (AI shuffles for all players in this version)
     _autoMixAI();
 
     // Auto-end shuffle after 4 seconds

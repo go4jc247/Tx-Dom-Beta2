@@ -9460,6 +9460,25 @@ async function startNewHand(){
   hideCallDoubleBanner();
   clearForcedDoubleGlow();
 
+  // ── Gather animation: slide all visible tiles to center before clearing ──
+  if (dealMode === 'shuffle' && spriteLayer.children.length > 0) {
+    const rect = document.getElementById('gameWrapper').getBoundingClientRect();
+    const cx = rect.width * 0.5;
+    const cy = rect.height * 0.5;
+    const allSprites = spriteLayer.querySelectorAll('.domino-sprite');
+    const gatherPromises = [];
+    for (let gi = 0; gi < allSprites.length; gi++) {
+      const sp = allSprites[gi];
+      if (sp && typeof sp.getPose === 'function') {
+        gatherPromises.push(animateSprite(sp, { x: cx - 28, y: cy - 56, s: 0.35, rz: Math.random() * 360, ry: 0 }, 400));
+      }
+    }
+    if (gatherPromises.length > 0) {
+      await Promise.all(gatherPromises);
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }
+
   shadowLayer.innerHTML = '';
   spriteLayer.innerHTML = '';
   sprites.length = 0;

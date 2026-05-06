@@ -130,6 +130,69 @@ function _createRecordUI() {
   tableEl.appendChild(container);
 }
 
+// Influence circle visualization
+var _influenceCircles = [];
+var _influenceRAF = null;
+
+function _startInfluenceViz() {
+  var tableEl = document.getElementById('gameWrapper');
+  if (!tableEl || _influenceRAF) return;
+
+  function updateCircles() {
+    _influenceRAF = requestAnimationFrame(updateCircles);
+    if (!_shufflePhysicsActive) { _stopInfluenceViz(); return; }
+
+    var R = SHUFFLE_PHYSICS.grabRadius;
+    var needed = 0;
+    var positions = [];
+
+    // Collect active finger positions
+    if (_shufflePhysicsPointer.active) {
+      if (_shufflePhysicsPointer._isTouch) {
+        var touchKeys = Object.keys(_shuffleTouchPointers);
+        for (var tk = 0; tk < touchKeys.length; tk++) {
+          if (touchKeys[tk].indexOf('_pb') === 0) continue;
+          var tp = _shuffleTouchPointers[touchKeys[tk]];
+          if (tp) positions.push({ x: tp.x, y: tp.y });
+        }
+      } else {
+        positions.push({ x: _shufflePhysicsPointer.x, y: _shufflePhysicsPointer.y });
+      }
+    }
+
+    // Ensure enough circle elements
+    while (_influenceCircles.length < positions.length) {
+      var circle = document.createElement('div');
+      circle.className = 'influenceCircle';
+      circle.style.cssText = 'position:absolute;border:2px dashed rgba(59,130,246,0.4);border-radius:50%;pointer-events:none;z-index:505;transform:translate(-50%,-50%);';
+      tableEl.appendChild(circle);
+      _influenceCircles.push(circle);
+    }
+
+    // Update positions and sizes, hide extras
+    for (var i = 0; i < _influenceCircles.length; i++) {
+      if (i < positions.length) {
+        _influenceCircles[i].style.display = 'block';
+        _influenceCircles[i].style.width = (R * 2) + 'px';
+        _influenceCircles[i].style.height = (R * 2) + 'px';
+        _influenceCircles[i].style.left = positions[i].x + 'px';
+        _influenceCircles[i].style.top = positions[i].y + 'px';
+      } else {
+        _influenceCircles[i].style.display = 'none';
+      }
+    }
+  }
+  updateCircles();
+}
+
+function _stopInfluenceViz() {
+  if (_influenceRAF) { cancelAnimationFrame(_influenceRAF); _influenceRAF = null; }
+  for (var i = 0; i < _influenceCircles.length; i++) {
+    _influenceCircles[i].remove();
+  }
+  _influenceCircles = [];
+}
+
 function _enterShuffleEditor() {
   _shuffleEditorActive = true;
   var tableEl = document.getElementById('gameWrapper');
@@ -146,6 +209,9 @@ function _enterShuffleEditor() {
   // Remove playback ghosts
   var ghosts = document.querySelectorAll('.playbackGhost');
   for (var gi = 0; gi < ghosts.length; gi++) ghosts[gi].remove();
+
+  // Show influence circles
+  _startInfluenceViz();
 
   // Gather tiles to center, then release
   _shuffleGatherActive = true;
@@ -225,9 +291,37 @@ function _enterShuffleEditor() {
 
   container.appendChild(row1);
 
-  // Row 2: RESUME button
+  // Row 2: Radius slider
   var row2 = document.createElement('div');
-  row2.style.cssText = 'display:flex;gap:6px;';
+  row2.style.cssText = 'display:flex;gap:6px;align-items:center;';
+
+  var radLabel = document.createElement('span');
+  radLabel.style.cssText = 'color:rgba(255,255,255,0.6);font-size:10px;font-family:system-ui,sans-serif;';
+  radLabel.textContent = 'Radius:';
+  row2.appendChild(radLabel);
+
+  var radSlider = document.createElement('input');
+  radSlider.type = 'range';
+  radSlider.min = '60';
+  radSlider.max = '400';
+  radSlider.value = String(SHUFFLE_PHYSICS.grabRadius);
+  radSlider.style.cssText = 'width:100px;height:4px;accent-color:#3b82f6;';
+  radSlider.addEventListener('input', function() {
+    SHUFFLE_PHYSICS.grabRadius = parseInt(radSlider.value);
+    radVal.textContent = radSlider.value + 'px';
+  });
+  row2.appendChild(radSlider);
+
+  var radVal = document.createElement('span');
+  radVal.style.cssText = 'color:rgba(255,255,255,0.6);font-size:10px;font-family:monospace;min-width:36px;';
+  radVal.textContent = SHUFFLE_PHYSICS.grabRadius + 'px';
+  row2.appendChild(radVal);
+
+  container.appendChild(row2);
+
+  // Row 3: RESUME + status
+  var row3 = document.createElement('div');
+  row3.style.cssText = 'display:flex;gap:6px;';
 
   var resumeBtn = document.createElement('button');
   resumeBtn.textContent = 'RESUME';
@@ -235,7 +329,7 @@ function _enterShuffleEditor() {
   resumeBtn.addEventListener('click', function() {
     _exitShuffleEditor();
   });
-  row2.appendChild(resumeBtn);
+  row3.appendChild(resumeBtn);
 
   var statusEl = document.createElement('span');
   statusEl.id = 'shuffleEdStatus';
@@ -243,9 +337,9 @@ function _enterShuffleEditor() {
   var existingCount = 0;
   try { var s = localStorage.getItem('txdom_userRecordings'); if (s) existingCount = JSON.parse(s).length; } catch(e) {}
   statusEl.textContent = existingCount + ' saved — shuffle & record!';
-  row2.appendChild(statusEl);
+  row3.appendChild(statusEl);
 
-  container.appendChild(row2);
+  container.appendChild(row3);
 
   // Show hint
   var hintEl = document.getElementById('shuffleHint');
@@ -367,6 +461,8 @@ function _exitShuffleEditor() {
     _shuffleRecording = false;
     clearInterval(_shuffleRecordInterval);
   }
+  // Stop influence visualization
+  _stopInfluenceViz();
   // Reset tiles to center
   _editorResetTiles();
   // Continue normal shuffle — end for pick

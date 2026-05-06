@@ -1560,14 +1560,14 @@ async function _runPickPhase() {
       entry._body._pileSeat = seat;
       // High friction, no bounce — tiles block each other but don't bounce around
       entry._body.friction = 0.8;
-      entry._body.frictionAir = 0.15;
+      entry._body.frictionAir = 0.08;
       entry._body.restitution = 0;
-      // Give it a gentle nudge toward pile center — physics does the rest
+      // Strong push toward pile center — arrives in ~1-2 seconds
       var dx = pos.x - entry._body.position.x;
       var dy = pos.y - entry._body.position.y;
       var d = Math.sqrt(dx * dx + dy * dy);
       if (d > 1) {
-        var speed = Math.min(d * 0.15, 8);
+        var speed = Math.min(d * 0.4, 20);
         Matter.Body.setVelocity(entry._body, { x: dx / d * speed, y: dy / d * speed });
       }
       Matter.Body.setAngularVelocity(entry._body, 0);
@@ -1749,27 +1749,62 @@ async function _runPickPhase() {
   }
 
   function playerPickPhase() {
-    // If auto-select is on, pick randomly like AI
+    // If auto-select is on, use slideTileToSeat just like AI players
     if (_autoSelectPick) {
-      return new Promise(function(resolve) {
+      return (async function() {
         hint.textContent = 'Auto-selecting your dominoes...';
         counter.textContent = '0 / ' + handSize;
-        var autoPicked = 0;
-        function autoPickOne() {
-          if (autoPicked >= handSize) { resolve(); return; }
-          var available = [];
-          for (var i = 0; i < pool.length; i++) {
-            if (!pool[i].picked && pool[i]._body && !pool[i]._body.isStatic) available.push(pool[i]);
-          }
-          if (available.length === 0) { resolve(); return; }
-          var entry = available[Math.floor(Math.random() * available.length)];
-          pickTileForPlayer(entry);
-          autoPicked++;
-          counter.textContent = autoPicked + ' / ' + handSize;
-          setTimeout(autoPickOne, _pickSpeedUp ? 50 : 200);
+        var color = 'rgba(59,130,246,';
+        var center = getSeatHandCenter(localSeat);
+        var picked = 0;
+        var slidePs = [];
+        var grabs = [];
+        var rem = handSize;
+        while (rem > 0) {
+          var gc = (Math.random() < 0.35 && rem >= 2) ? 2 : 1;
+          grabs.push(gc);
+          rem -= gc;
         }
-        setTimeout(autoPickOne, 300);
-      });
+        var totalTime = (3000 + Math.random() * 2000) / (SPEED_MULTIPLIER * SP.pickAnimSpeed);
+        var gap = totalTime / grabs.length;
+        for (var gi = 0; gi < grabs.length; gi++) {
+          if (_pickSpeedUp) {
+            while (picked < handSize) {
+              var av = [];
+              for (var j = 0; j < pool.length; j++) {
+                if (!pool[j].picked && pool[j]._body && !pool[j]._body.isStatic) av.push(pool[j]);
+              }
+              if (av.length === 0) break;
+              var en = av[Math.floor(Math.random() * av.length)];
+              en.picked = true;
+              slidePs.push(slideTileToSeat(en, localSeat, picked, center, color));
+              picked++;
+              counter.textContent = picked + ' / ' + handSize;
+            }
+            break;
+          }
+          var grabCount = grabs[gi];
+          for (var g = 0; g < grabCount; g++) {
+            var available = [];
+            for (var j = 0; j < pool.length; j++) {
+              if (!pool[j].picked && pool[j]._body && !pool[j]._body.isStatic) available.push(pool[j]);
+            }
+            if (available.length === 0) break;
+            var entry = available[Math.floor(Math.random() * available.length)];
+            entry.picked = true;
+            slidePs.push(slideTileToSeat(entry, localSeat, picked, center, color));
+            picked++;
+            counter.textContent = picked + ' / ' + handSize;
+            if (g === 0 && grabCount > 1) {
+              await new Promise(function(r) { setTimeout(r, 80 + Math.random() * 120); });
+            }
+          }
+          if (gi < grabs.length - 1) {
+            await new Promise(function(r) { setTimeout(r, gap * (0.7 + Math.random() * 0.6)); });
+          }
+        }
+        await Promise.all(slidePs);
+      })();
     }
 
     return new Promise(function(resolve) {

@@ -2078,10 +2078,16 @@ async function _runPickPhase() {
   // Group 1: Opponents of shuffler
   var aiOpponents = opponentSeats.filter(function(s) { return s !== localSeat; });
   if (localIsOpponent) {
-    hint.textContent = 'Your team picks — slide ' + handSize + ' dominoes';
-    // Player picks first, then AI picks (prevents speed-up from stealing player's tiles)
-    await playerPickPhase();
-    if (aiOpponents.length > 0) await aiGroupPick(aiOpponents, '');
+    if (_autoSelectPick) {
+      // Auto: player picks simultaneously with AI groupmates
+      hint.textContent = 'Your team picking...';
+      await Promise.all([playerPickPhase(), aiOpponents.length > 0 ? aiGroupPick(aiOpponents, '') : Promise.resolve()]);
+    } else {
+      hint.textContent = 'Your team picks — slide ' + handSize + ' dominoes';
+      // Player picks first, then AI picks (prevents speed-up from stealing player's tiles)
+      await playerPickPhase();
+      if (aiOpponents.length > 0) await aiGroupPick(aiOpponents, '');
+    }
   } else {
     await aiGroupPick(opponentSeats, 'Opponents picking...');
   }
@@ -2089,10 +2095,16 @@ async function _runPickPhase() {
   // Group 2: Partners of shuffler (not shuffler themselves)
   var aiPartners = partnerSeats.filter(function(s) { return s !== localSeat; });
   if (localIsPartner) {
-    hint.textContent = 'Your turn — slide ' + handSize + ' dominoes';
-    // Player picks first, then AI picks
-    await playerPickPhase();
-    if (aiPartners.length > 0) await aiGroupPick(aiPartners, '');
+    if (_autoSelectPick) {
+      // Auto: player picks simultaneously with AI groupmates
+      hint.textContent = 'Your team picking...';
+      await Promise.all([playerPickPhase(), aiPartners.length > 0 ? aiGroupPick(aiPartners, '') : Promise.resolve()]);
+    } else {
+      hint.textContent = 'Your turn — slide ' + handSize + ' dominoes';
+      // Player picks first, then AI picks
+      await playerPickPhase();
+      if (aiPartners.length > 0) await aiGroupPick(aiPartners, '');
+    }
   } else if (partnerSeats.length > 0) {
     await aiGroupPick(partnerSeats, 'Partner(s) picking...');
   }

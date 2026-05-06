@@ -169,9 +169,32 @@
               }
               return;
             }
+            // Deduplicate retried messages — only display once
+            if (msg.text === ccLastReceivedText) {
+              // Still send ack for retries so Python stops
+              if (ccSocket && ccSocket.readyState === WebSocket.OPEN) {
+                ccSocket.send(JSON.stringify({
+                  type: 'chat', room: CC_ROOM, seat: 0,
+                  name: (typeof playerName !== 'undefined' ? playerName : 'Game'),
+                  text: '__ack__',
+                  t: Date.now()
+                }));
+              }
+              return;
+            }
+            ccLastReceivedText = msg.text;
             claudeChatAddMessage(msg.name || 'Unknown', msg.text || '', false, false);
             ccAddMiniMessage(msg.name || 'Unknown', msg.text || '', false);
             ccClearPending();
+            // Send ack back so Python knows message was received
+            if (ccSocket && ccSocket.readyState === WebSocket.OPEN) {
+              ccSocket.send(JSON.stringify({
+                type: 'chat', room: CC_ROOM, seat: 0,
+                name: (typeof playerName !== 'undefined' ? playerName : 'Game'),
+                text: '__ack__',
+                t: Date.now()
+              }));
+            }
             // Show badge if chat is minimized (bubble visible)
             ccShowBadge();
           }
@@ -217,6 +240,7 @@
   // ---- Send with retry until acknowledged ----
   let ccRetryTimer = null;
   let ccPendingMsg = null;
+  let ccLastReceivedText = null;  // deduplicate retried messages
 
   // Game state debug info
   function ccGetGameStatus() {

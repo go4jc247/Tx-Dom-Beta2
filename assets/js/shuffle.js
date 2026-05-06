@@ -135,9 +135,32 @@ function _enterShuffleEditor() {
   var tableEl = document.getElementById('gameWrapper');
   if (!tableEl) return;
 
-  // Stop the auto-end timeout
-  // (we can't easily clear it, but the check in the timeout uses _shufflePhysicsResolve)
-  // Just mark editor active — _endShuffleForPick will check
+  // Stop any active AI playback
+  _sandboxPlaybackActive = false;
+  _shufflePhysicsPointer.active = false;
+  // Clear all playback touch pointers
+  var tpKeys = Object.keys(_shuffleTouchPointers);
+  for (var tk = 0; tk < tpKeys.length; tk++) {
+    if (tpKeys[tk].indexOf('_pb') === 0) delete _shuffleTouchPointers[tpKeys[tk]];
+  }
+  // Remove playback ghosts
+  var ghosts = document.querySelectorAll('.playbackGhost');
+  for (var gi = 0; gi < ghosts.length; gi++) ghosts[gi].remove();
+
+  // Gather tiles to center, then release
+  _shuffleGatherActive = true;
+  _shuffleGatherStartTime = performance.now();
+  setTimeout(function() {
+    _shuffleGatherActive = false;
+    // Stop all tile movement
+    for (var bi = 0; bi < _shufflePhysicsBodies.length; bi++) {
+      var body = _shufflePhysicsBodies[bi];
+      if (!body.isStatic) {
+        Matter.Body.setVelocity(body, { x: 0, y: 0 });
+        Matter.Body.setAngularVelocity(body, 0);
+      }
+    }
+  }, 1500);
 
   // Replace the UI with editor controls
   var container = document.getElementById('shuffleRecordUI');

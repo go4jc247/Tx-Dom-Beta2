@@ -90,9 +90,136 @@ var _shuffleTouchPointers = {}; // keyed by touch identifier: { x, y, px, py, vx
 var _shufflePhysicsResolve = null;
 // Recording system
 var _shuffleRecording = false;
-var _shuffleRecordData = [];  // array of { t, x, y, vx, vy }
+var _shuffleRecordData = [];  // array of { t, x, y, vx, vy, f? }
 var _shuffleRecordStart = 0;
 var _shuffleExportedRecordings = []; // in-memory backup of exported recordings
+var _shuffleRecordInterval = null;
+
+function _createRecordUI() {
+  var tableEl = document.getElementById('gameWrapper');
+  if (!tableEl) return;
+
+  var container = document.createElement('div');
+  container.id = 'shuffleRecordUI';
+  container.style.cssText = 'position:absolute;top:8px;right:8px;z-index:620;display:flex;gap:6px;';
+
+  // Record/Stop button
+  var recBtn = document.createElement('button');
+  recBtn.id = 'shuffleRecBtn';
+  recBtn.textContent = 'REC';
+  recBtn.style.cssText = 'padding:6px 14px;border-radius:16px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:rgba(255,255,255,0.8);font-size:11px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;';
+  recBtn.addEventListener('click', function() {
+    if (_shuffleRecording) {
+      // Stop recording
+      _shuffleRecording = false;
+      clearInterval(_shuffleRecordInterval);
+      recBtn.textContent = 'REC';
+      recBtn.style.background = 'rgba(0,0,0,0.5)';
+      recBtn.style.color = 'rgba(255,255,255,0.8)';
+      // Save recording
+      if (_shuffleRecordData.length > 10) {
+        var recs = [];
+        try { var s = localStorage.getItem('txdom_userRecordings'); if (s) recs = JSON.parse(s); } catch(e) {}
+        recs.push({ points: _shuffleRecordData });
+        _shuffleExportedRecordings.push({ points: _shuffleRecordData });
+        try { localStorage.setItem('txdom_userRecordings', JSON.stringify(recs)); } catch(e) {}
+        countEl.textContent = recs.length + ' saved';
+        console.log('[Shuffle] Saved recording: ' + _shuffleRecordData.length + ' points');
+      }
+      _shuffleRecordData = [];
+    } else {
+      // Start recording
+      _shuffleRecording = true;
+      _shuffleRecordStart = performance.now();
+      _shuffleRecordData = [];
+      recBtn.textContent = 'STOP';
+      recBtn.style.background = 'rgba(220,38,38,0.6)';
+      recBtn.style.color = '#fff';
+      // Sample touch data every 16ms
+      _shuffleRecordInterval = setInterval(function() {
+        if (!_shuffleRecording || !_shufflePhysicsActive) {
+          clearInterval(_shuffleRecordInterval);
+          return;
+        }
+        var ac = _shuffleAreaCenter;
+        var t = Math.round(performance.now() - _shuffleRecordStart);
+        // Record all active fingers
+        var touchKeys = Object.keys(_shuffleTouchPointers);
+        for (var tk = 0; tk < touchKeys.length; tk++) {
+          var key = touchKeys[tk];
+          if (key.indexOf('_pb') === 0) continue; // skip playback pointers
+          var tp = _shuffleTouchPointers[key];
+          if (tp) {
+            _shuffleRecordData.push({
+              t: t,
+              x: (tp.x - ac.x) / ac.r,
+              y: (tp.y - ac.y) / ac.r,
+              vx: tp.vx / ac.r,
+              vy: tp.vy / ac.r,
+              f: parseInt(key) || 0
+            });
+          }
+        }
+        // Also record mouse if active and no touch
+        if (touchKeys.length === 0 && _shufflePhysicsPointer.active) {
+          var ptr = _shufflePhysicsPointer;
+          _shuffleRecordData.push({
+            t: t,
+            x: (ptr.x - ac.x) / ac.r,
+            y: (ptr.y - ac.y) / ac.r,
+            vx: ptr.vx / ac.r,
+            vy: ptr.vy / ac.r
+          });
+        }
+      }, 16);
+    }
+  });
+  container.appendChild(recBtn);
+
+  // Clear button
+  var clearBtn = document.createElement('button');
+  clearBtn.textContent = 'CLR';
+  clearBtn.style.cssText = 'padding:6px 14px;border-radius:16px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:rgba(255,255,255,0.8);font-size:11px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;';
+  clearBtn.addEventListener('click', function() {
+    try { localStorage.removeItem('txdom_userRecordings'); } catch(e) {}
+    _shuffleExportedRecordings = [];
+    countEl.textContent = '0 saved';
+    console.log('[Shuffle] Cleared all user recordings');
+  });
+  container.appendChild(clearBtn);
+
+  // Count display
+  var countEl = document.createElement('span');
+  countEl.style.cssText = 'color:rgba(255,255,255,0.5);font-size:10px;font-weight:600;font-family:system-ui,sans-serif;line-height:30px;';
+  var existingCount = 0;
+  try { var s = localStorage.getItem('txdom_userRecordings'); if (s) existingCount = JSON.parse(s).length; } catch(e) {}
+  countEl.textContent = existingCount + ' saved';
+  container.appendChild(countEl);
+
+  tableEl.appendChild(container);
+}
+
+function _removeRecordUI() {
+  // Stop any active recording
+  if (_shuffleRecording) {
+    _shuffleRecording = false;
+    clearInterval(_shuffleRecordInterval);
+  }
+  var ui = document.getElementById('shuffleRecordUI');
+  if (ui) ui.remove();
+}
+
+// Load user recordings from localStorage into the pool
+(function() {
+  try {
+    var s = localStorage.getItem('txdom_userRecordings');
+    if (s) {
+      var recs = JSON.parse(s);
+      if (Array.isArray(recs)) _shuffleExportedRecordings = recs;
+      console.log('[Shuffle] Loaded ' + recs.length + ' user recordings from localStorage');
+    }
+  } catch(e) {}
+})();
 var _shuffleGatherActive = false;
 var _shuffleGatherStartTime = 0; // timestamp when gather was activated
 var _shuffleGatherRampMs = 2000; // ms to ramp from 0 to full gather force
@@ -190,6 +317,7 @@ async function performShuffleAnimation() {
     return new Promise(function(resolve) {
       _shufflePhysicsResolve = resolve;
       _startShufflePhysics();
+      _createRecordUI();
 
       // Track which tiles have been displaced from center
       var totalTiles = _shufflePhysicsBodies.length;
@@ -293,6 +421,7 @@ async function performShuffleAnimation() {
   return new Promise(function(resolve) {
     _shufflePhysicsResolve = resolve;
     _startShufflePhysics();
+    _createRecordUI();
 
     _autoMixAI();
 
@@ -1188,6 +1317,7 @@ function _endShuffleForPick() {
   _shuffleGatherActive = false;
   _sandboxPlaybackActive = false; // stop any recording playback
   _shufflePhysicsPointer.active = false;
+  _removeRecordUI();
 
   // Don't cleanup hands here — let _runPickPhase do the gather animation with hands
 

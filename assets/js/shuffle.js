@@ -365,6 +365,7 @@ function _editorStartRecording() {
     if (statusEl) statusEl.textContent = 'Recording...';
 
     // Sample touch data every 16ms
+    // Assign finger IDs based on screen position: left side = finger 0, right side = finger 1
     _shuffleRecordInterval = setInterval(function() {
       if (!_shuffleRecording || !_shufflePhysicsActive) {
         clearInterval(_shuffleRecordInterval);
@@ -372,6 +373,8 @@ function _editorStartRecording() {
       }
       var ac = _shuffleAreaCenter;
       var t = Math.round(performance.now() - _shuffleRecordStart);
+      var centerX = ac.x; // screen center X for left/right determination
+
       // Record all active fingers
       var touchKeys = Object.keys(_shuffleTouchPointers);
       var recorded = false;
@@ -380,13 +383,15 @@ function _editorStartRecording() {
         if (key.indexOf('_pb') === 0) continue;
         var tp = _shuffleTouchPointers[key];
         if (tp) {
+          // Assign hand: 0 = left hand (left side of screen), 1 = right hand (right side)
+          var handId = tp.x < centerX ? 0 : 1;
           _shuffleRecordData.push({
             t: t,
             x: (tp.x - ac.x) / ac.r,
             y: (tp.y - ac.y) / ac.r,
             vx: tp.vx / ac.r,
             vy: tp.vy / ac.r,
-            f: parseInt(key) || 0
+            f: handId
           });
           recorded = true;
         }
@@ -394,12 +399,14 @@ function _editorStartRecording() {
       // Also record mouse if active and no touch
       if (!recorded && _shufflePhysicsPointer.active) {
         var ptr = _shufflePhysicsPointer;
+        var handId = ptr.x < centerX ? 0 : 1;
         _shuffleRecordData.push({
           t: t,
           x: (ptr.x - ac.x) / ac.r,
           y: (ptr.y - ac.y) / ac.r,
           vx: ptr.vx / ac.r,
-          vy: ptr.vy / ac.r
+          vy: ptr.vy / ac.r,
+          f: handId
         });
       }
     }, 16);
@@ -1348,41 +1355,39 @@ function _shufflePhysicsLoop() {
 
   // Apply grab force from pointer (and mirror point for mouse)
   if (ptr.active) {
-    var speed = Math.hypot(ptr.vx, ptr.vy);
-    if (speed > 0.5) {
-      var R = SP.grabRadius;
-      var R2 = R * R;
+    var R = SP.grabRadius;
+    var R2 = R * R;
 
-      // Build list of force points
-      var ac = _shuffleAreaCenter;
-      var forcePoints = [];
-      if (ptr._isTouch) {
-        // Touch: use all active touch pointers (real multi-finger input)
-        var touchKeys = Object.keys(_shuffleTouchPointers);
-        for (var tk = 0; tk < touchKeys.length; tk++) {
-          var tp = _shuffleTouchPointers[touchKeys[tk]];
-          forcePoints.push({ x: tp.x, y: tp.y, vx: tp.vx, vy: tp.vy, grabR: tp.grabR || 0 });
-        }
-        if (forcePoints.length === 0) {
-          forcePoints.push({ x: ptr.x, y: ptr.y, vx: ptr.vx, vy: ptr.vy, grabR: 0 });
-        }
-      } else {
-        // Mouse: primary + 180° mirror
-        forcePoints.push({ x: ptr.x, y: ptr.y, vx: ptr.vx, vy: ptr.vy });
-        if (ac) {
-          forcePoints.push({
-            x: 2 * ac.x - ptr.x,
-            y: 2 * ac.y - ptr.y,
-            vx: -ptr.vx,
-            vy: -ptr.vy
-          });
-        }
+    // Build list of force points
+    var ac = _shuffleAreaCenter;
+    var forcePoints = [];
+    if (ptr._isTouch) {
+      // Touch: use all active touch pointers (real multi-finger input)
+      var touchKeys = Object.keys(_shuffleTouchPointers);
+      for (var tk = 0; tk < touchKeys.length; tk++) {
+        var tp = _shuffleTouchPointers[touchKeys[tk]];
+        forcePoints.push({ x: tp.x, y: tp.y, vx: tp.vx, vy: tp.vy, grabR: tp.grabR || 0 });
       }
+      if (forcePoints.length === 0) {
+        forcePoints.push({ x: ptr.x, y: ptr.y, vx: ptr.vx, vy: ptr.vy, grabR: 0 });
+      }
+    } else {
+      // Mouse: primary + 180° mirror
+      forcePoints.push({ x: ptr.x, y: ptr.y, vx: ptr.vx, vy: ptr.vy });
+      if (ac) {
+        forcePoints.push({
+          x: 2 * ac.x - ptr.x,
+          y: 2 * ac.y - ptr.y,
+          vx: -ptr.vx,
+          vy: -ptr.vy
+        });
+      }
+    }
 
-      for (var fp = 0; fp < forcePoints.length; fp++) {
-        var pt = forcePoints[fp];
-        var spd = Math.hypot(pt.vx, pt.vy);
-        if (spd < 0.5) continue;
+    for (var fp = 0; fp < forcePoints.length; fp++) {
+      var pt = forcePoints[fp];
+      var spd = Math.hypot(pt.vx, pt.vy);
+      if (spd < 0.5) continue;
         // Use per-finger grab radius if available, otherwise global
         var fpR = (pt.grabR > 0) ? pt.grabR : R;
         var fpR2 = fpR * fpR;
@@ -1402,29 +1407,11 @@ function _shufflePhysicsLoop() {
             y: pt.vy * Math.pow(t, SP.grabFalloff) * SP.grabStrength
           });
         }
-      }
     }
   }
 
-  // Record all active touch pointers individually with stable touch IDs
-  if (_shuffleRecording) {
-    var recT = performance.now() - _shuffleRecordStart;
-    if (ptr._isTouch && ptr.active) {
-      var tkeys = Object.keys(_shuffleTouchPointers);
-      for (var tk = 0; tk < tkeys.length; tk++) {
-        var tp = _shuffleTouchPointers[tkeys[tk]];
-        if (Math.abs(tp.vx) < 0.01 && Math.abs(tp.vy) < 0.01) continue; // skip stationary
-        _shuffleRecordData.push({
-          t: recT, f: tkeys[tk], // f = stable touch identifier
-          x: tp.x, y: tp.y, vx: tp.vx, vy: tp.vy,
-          grabR: tp.grabR || 0
-        });
-      }
-    } else if (ptr.active) {
-      // Mouse fallback
-      _shuffleRecordData.push({ t: recT, f: 0, x: ptr.x, y: ptr.y, vx: ptr.vx, vy: ptr.vy, grabR: 0 });
-    }
-  }
+  // Recording is handled by the editor's interval (_editorStartRecording)
+  // which normalizes coordinates properly for the recording format
 
   // Step physics
   Matter.Engine.update(engine, (1000/60) * SP.timeScale);

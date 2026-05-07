@@ -162,85 +162,121 @@ function pure42_evaluateHandForBid(hand) {
     if (topTrumpsHeld >= 2) {
       // We have top 2+ trumps — safe, we control trump
       trumpRisk = 0;
-    } else {
-      // We'll lose at least 1 trump trick
+    } else if (topTrumpsHeld === 1) {
+      // We have the double but not second highest — will lose 1 trump trick
       trumpRisk = 1;
-      // Check if trump count tiles are at risk
       for (const ct of P42_COUNT_TILES) {
         const isTrump = ct.tile[0] === trumpPip || ct.tile[1] === trumpPip;
         if (isTrump && !hand.some(h => _p42TileEq(h, ct.tile))) {
           trumpRisk += ct.pts;
         }
       }
+    } else {
+      // We DON'T have the double trump — significant risk
+      // Will lose at least 1 trump trick, possibly more
+      // Doubles are vulnerable to being trumped by opponents
+      trumpRisk = 2; // lose at least 1 trick, opponent controls trump timing
+      for (const ct of P42_COUNT_TILES) {
+        const isTrump = ct.tile[0] === trumpPip || ct.tile[1] === trumpPip;
+        if (isTrump && !hand.some(h => _p42TileEq(h, ct.tile))) {
+          trumpRisk += ct.pts;
+        }
+      }
+      // Extra penalty: without the double, opponents keep their trumps longer
+      // making our non-trump doubles vulnerable
+      const ntDbls = doubles.filter(d => d[0] !== trumpPip).length;
+      trumpRisk += ntDbls > 0 ? 5 : 10;
     }
 
     // ── OFF RISK ──
+    const nonTrumpDoubles = doubles.filter(d => d[0] !== trumpPip);
     const offs = hand.filter(t => {
       if (t[0] === t[1]) return false; // doubles
       if (t[0] === trumpPip || t[1] === trumpPip) return false; // trumps
       return true;
     });
 
-    // FIVE-OFF RULE: if any off has 5 as high pip and 5 is not trump → 15pt risk, usually pass
+    // BOOK RULE: need supporting doubles for offs. No doubles = extremely risky.
+    // With 3+ offs and 0 non-trump doubles, this is almost never a bidding hand.
+    if (offs.length >= 3 && nonTrumpDoubles.length === 0) continue;
+
+    // FIVE-OFF RULE: 5-off risks 15pts (5-5 + 5-0). Book says almost never bid.
     const hasDangerousFiveOff = offs.some(off => {
       const highPip = Math.max(off[0], off[1]);
-      return highPip === 5 && trumpPip !== 5;
+      if (highPip !== 5 || trumpPip === 5) return false;
+      // Check if both 5-5 and 5-0 are NOT in hand and NOT trump
+      const has55 = hand.some(h => _p42TileEq(h, [5,5]));
+      const has50 = hand.some(h => _p42TileEq(h, [5,0]));
+      const is50trump = trumpPip === 0;
+      return !has55 && !has50 && !is50trump; // both exposed = deadly
     });
-    // FOUR-OFF RULE: if 4 is high pip and neither 4 nor 6 is trump → 15pt risk
+    if (hasDangerousFiveOff) continue; // Book: don't bid with unprotected 5-off
+
+    // FOUR-OFF RULE: 4-off risks 15pts (6-4 + 4-1).
     const hasDangerousFourOff = offs.some(off => {
       const highPip = Math.max(off[0], off[1]);
-      return highPip === 4 && trumpPip !== 4 && trumpPip !== 6;
+      if (highPip !== 4) return false;
+      const is64trump = trumpPip === 6;
+      const is41trump = trumpPip === 1;
+      const has64 = hand.some(h => _p42TileEq(h, [6,4]));
+      const has41 = hand.some(h => _p42TileEq(h, [4,1]));
+      // Dangerous if BOTH count tiles are exposed
+      return !has64 && !has41 && !is64trump && !is41trump;
     });
+    if (hasDangerousFourOff) continue; // Book: don't bid with exposed 4-off
 
     let totalOffRisk = 0;
-    const riskedCounts = new Set();
 
     for (const off of offs) {
       const highPip = Math.max(off[0], off[1]);
       const lowPip = Math.min(off[0], off[1]);
       const hasDoubleAhead = doublePips.has(highPip);
 
-      // High-side risk
-      let highRisk = 1;
+      // FIX: If the off itself IS a count tile, add its value as inherent risk
+      const offIsCount = (off[0] + off[1] === 5 || off[0] + off[1] === 10);
+
+      // High-side risk (each off evaluated independently — no cross-off dedup)
+      let highRisk = 1; // minimum 1 trick point
+      if (offIsCount) highRisk += (off[0] + off[1] === 10 ? 10 : 5); // the off itself is count
       for (const ct of P42_COUNT_TILES) {
         const isTrump = ct.tile[0] === trumpPip || ct.tile[1] === trumpPip;
-        if (isTrump) continue; // count tile is a trump, not at risk in this suit
+        if (isTrump) continue;
         if (ct.suits.includes(highPip) && !_p42TileEq(ct.tile, off)) {
           const inHand = hand.some(h => _p42TileEq(h, ct.tile));
           if (!inHand) {
-            const key = _p42TileKey(ct.tile[0], ct.tile[1]);
-            if (!riskedCounts.has(key)) {
-              highRisk += ct.pts;
-              riskedCounts.add(key);
-            }
+            highRisk += ct.pts;
           }
         }
       }
       if (hasDoubleAhead && highRisk > 1) {
+        // Double ahead pulls count ~60% of the time. Reduce risk but not to zero.
         highRisk = Math.max(1, Math.ceil(highRisk * 0.4));
       }
 
-      // Low-side risk
+      // Low-side risk (if opponent leads this suit instead of you)
       let lowRisk = 1;
+      if (offIsCount) lowRisk += (off[0] + off[1] === 10 ? 10 : 5);
       for (const ct of P42_COUNT_TILES) {
         const isTrump = ct.tile[0] === trumpPip || ct.tile[1] === trumpPip;
         if (isTrump) continue;
         if (ct.suits.includes(lowPip) && !_p42TileEq(ct.tile, off)) {
           const inHand = hand.some(h => _p42TileEq(h, ct.tile));
           if (!inHand) {
-            const key = _p42TileKey(ct.tile[0], ct.tile[1]);
-            if (!riskedCounts.has(key)) {
-              lowRisk += ct.pts;
-            }
+            lowRisk += ct.pts;
           }
         }
       }
 
+      // Book: take the higher of the two risks, don't add
       totalOffRisk += Math.max(highRisk, lowRisk);
     }
 
-    // Partner help
-    if (offs.length >= 2) totalOffRisk = Math.max(0, totalOffRisk - 6);
+    // Partner help: with 2+ offs, expect partner to win 1 trick
+    // But be conservative — only deduct up to 1 trick's worth (6 points)
+    // and only if offs are moderate risk (don't help when everything is deadly)
+    if (offs.length >= 2 && offs.length <= 3 && nonTrumpDoubles.length >= 1) {
+      totalOffRisk = Math.max(0, totalOffRisk - 6);
+    }
 
     const totalRisk = trumpRisk + totalOffRisk;
     const pipBid = Math.min(42, 42 - totalRisk);

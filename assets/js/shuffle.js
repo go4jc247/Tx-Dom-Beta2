@@ -106,7 +106,7 @@ function _createRecordUI() {
   container.id = 'shuffleRecordUI';
   container.style.cssText = 'position:absolute;top:8px;right:8px;z-index:620;display:flex;gap:6px;align-items:center;';
 
-  var btnStyle = 'padding:6px 14px;border-radius:16px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:rgba(255,255,255,0.8);font-size:11px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;';
+  var btnStyle = 'padding:6px 14px;border-radius:16px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:rgba(255,255,255,0.8);font-size:11px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;pointer-events:auto;';
 
   // EDIT button — enters shuffle editor mode
   var editBtn = document.createElement('button');
@@ -232,9 +232,9 @@ function _enterShuffleEditor() {
   var container = document.getElementById('shuffleRecordUI');
   if (!container) return;
   container.innerHTML = '';
-  container.style.cssText = 'position:absolute;top:8px;right:8px;z-index:620;display:flex;flex-direction:column;gap:6px;align-items:flex-end;';
+  container.style.cssText = 'position:absolute;top:8px;right:8px;z-index:620;display:flex;flex-direction:column;gap:6px;align-items:flex-end;pointer-events:none;';
 
-  var btnStyle = 'padding:6px 14px;border-radius:16px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:rgba(255,255,255,0.8);font-size:11px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;';
+  var btnStyle = 'padding:6px 14px;border-radius:16px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:rgba(255,255,255,0.8);font-size:11px;font-weight:700;cursor:pointer;font-family:system-ui,sans-serif;pointer-events:auto;';
 
   // Row 1: REC/STOP + PLAY + CLR
   var row1 = document.createElement('div');
@@ -305,7 +305,7 @@ function _enterShuffleEditor() {
   radSlider.min = '60';
   radSlider.max = '400';
   radSlider.value = String(SHUFFLE_PHYSICS.grabRadius);
-  radSlider.style.cssText = 'width:100px;height:4px;accent-color:#3b82f6;';
+  radSlider.style.cssText = 'width:100px;height:4px;accent-color:#3b82f6;pointer-events:auto;';
   radSlider.addEventListener('input', function() {
     SHUFFLE_PHYSICS.grabRadius = parseInt(radSlider.value);
     radVal.textContent = radSlider.value + 'px';

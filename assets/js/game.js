@@ -11773,6 +11773,12 @@ function hideStartScreen(){
 // Game Settings popup
 let selectedMarksToWin = 7;
 
+// Rule Mode
+let pure42Mode = false; // Pure 42 = book rules only, no house rules
+try { pure42Mode = localStorage.getItem('txdom_pure42') === 'true'; } catch(e) {}
+
+// AI routing — pure42-ai.js overrides are applied at game start
+
 // House Rules
 let callForDoubleEnabled = true; // Call for the Double rule
 let nelloDoublesMode = 'regular'; // 'regular', 'doubles_only', 'player_chooses'
@@ -11801,6 +11807,38 @@ document.querySelectorAll('.gsMarksBtn').forEach(btn => {
     btn.classList.add('gsMarksSelected');
   });
 });
+
+// Rule Mode toggle (Pure 42 / Custom)
+function updateRuleModeUI() {
+  const houseRules = document.getElementById('gsHouseRulesSection');
+  const desc = document.getElementById('gsRuleModeDesc');
+  document.querySelectorAll('.gsRuleModeBtn').forEach(b => {
+    const isPure = b.dataset.rulemode === 'pure42';
+    const isActive = isPure ? pure42Mode : !pure42Mode;
+    b.style.border = isActive ? '2px solid #fff' : 'none';
+    if (isPure) {
+      b.style.background = isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#374151,#1f2937)';
+    } else {
+      b.style.background = isActive ? 'linear-gradient(135deg,#6366f1,#4f46e5)' : 'linear-gradient(135deg,#374151,#1f2937)';
+    }
+  });
+  if (houseRules) {
+    houseRules.style.opacity = pure42Mode ? '0.3' : '1';
+    houseRules.style.pointerEvents = pure42Mode ? 'none' : 'auto';
+  }
+  if (desc) {
+    desc.textContent = pure42Mode ? 'Pure 42: Standard rules from the book — no house rules' : 'Custom: choose your own house rules below';
+  }
+}
+document.querySelectorAll('.gsRuleModeBtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    pure42Mode = btn.dataset.rulemode === 'pure42';
+    try { localStorage.setItem('txdom_pure42', pure42Mode ? 'true' : 'false'); } catch(e) {}
+    updateRuleModeUI();
+  });
+});
+// Init on load
+setTimeout(updateRuleModeUI, 100);
 
 // Game type selector
 let selectedGameType = 'TN51';
@@ -11833,6 +11871,15 @@ document.getElementById('btnGameSettingsBack').addEventListener('click', () => {
 
 // Update game settings visibility based on selected game type
 function updateGameSettingsForMode(mode){
+  // Rule Mode toggle: only show for T42
+  var ruleModeSection = document.getElementById('gsRuleModeBtns');
+  var ruleModeDesc = document.getElementById('gsRuleModeDesc');
+  if(ruleModeSection) ruleModeSection.parentElement.style.display = (mode === 'T42') ? '' : 'none';
+  // If not T42, force custom mode
+  if(mode !== 'T42' && pure42Mode) {
+    pure42Mode = false;
+    updateRuleModeUI();
+  }
   // V10_111: gsNello2xSection removed
   var nelloDecSec = document.getElementById('gsNelloDeclareSection');
   if(nelloDecSec) nelloDecSec.style.display = (mode === 'MOON') ? 'none' : '';
@@ -11861,6 +11908,14 @@ function updateGameSettingsForMode(mode){
 
 document.getElementById('btnGameSettingsStart').addEventListener('click', () => {
   hideGameSettings();
+  // Pure 42 mode: enforce book rules
+  if (pure42Mode) {
+    callForDoubleEnabled = false;
+    doublesFollowMe = 'off';
+    nelloDeclareMode = false;
+    nelloDoublesMode = 'regular';
+    _dfmActiveThisHand = false;
+  }
   // V12.10.27c: Also hide carousel and color picker
   document.getElementById('gameSelectScreen').style.display = 'none';
   if(typeof _gsHideCarousel === 'function') _gsHideCarousel();

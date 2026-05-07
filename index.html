@@ -831,8 +831,18 @@ if ('serviceWorker' in navigator) {
           <button class="glossBtn gsMarksBtn" data-marks="15" style="padding:8px 18px;font-size:14px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:10px;color:#fff;cursor:pointer;min-width:60px;">15<br><span style="font-size:10px;opacity:0.7;">Long</span></button>
         </div>
       </div>
-    <!-- House Rules Section -->
+    <!-- Rule Mode Toggle -->
     <div style="border-top:1px solid rgba(255,255,255,0.15);padding:12px 16px;">
+      <div style="font-size:13px;color:rgba(255,255,255,0.8);font-weight:600;margin-bottom:10px;">Rule Mode</div>
+      <div id="gsRuleModeBtns" style="display:flex;gap:8px;margin-bottom:4px;">
+        <button class="glossBtn gsRuleModeBtn" data-rulemode="pure42" style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border-radius:10px;background:linear-gradient(135deg,#22c55e,#16a34a);border:2px solid #fff;color:#fff;cursor:pointer;">Pure 42</button>
+        <button class="glossBtn gsRuleModeBtn gsRuleModeSelected" data-rulemode="custom" style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;cursor:pointer;">Custom</button>
+      </div>
+      <div id="gsRuleModeDesc" style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:4px;">Custom: choose your own house rules below</div>
+    </div>
+
+    <!-- House Rules Section -->
+    <div id="gsHouseRulesSection" style="border-top:1px solid rgba(255,255,255,0.15);padding:12px 16px;">
       <div style="font-size:13px;color:rgba(255,255,255,0.8);font-weight:600;margin-bottom:10px;">House Rules</div>
 
       <!-- Call for the Double -->
@@ -1157,6 +1167,7 @@ if ('serviceWorker' in navigator) {
 <script src="./assets/js/claude-chat.js?v=14" defer></script>
 <script src="./assets/js/multiplayer.js" defer></script>
 <script src="./assets/js/ai-engine.js" defer></script>
+<script src="./assets/js/pure42-ai.js" defer></script>
 <script src="./assets/js/mp-social.js" defer></script>
 <script src="./assets/js/orientation.js" defer></script>
 <script src="./assets/js/popup-config.js" defer></script>

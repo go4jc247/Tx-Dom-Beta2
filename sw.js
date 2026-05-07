@@ -4,7 +4,7 @@
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v13.5.DEV.11';
+const CACHE_NAME = 'tx-dom-v13.5.DEV.12';
 const urlsToCache = [
   './index.html',
   './sw.js',
@@ -15,6 +15,7 @@ const urlsToCache = [
   './assets/js/game.js',
   './assets/js/multiplayer.js',
   './assets/js/ai-engine.js',
+  './assets/js/pure42-ai.js',
   './assets/js/mp-social.js',
   './assets/js/orientation.js',
   './assets/js/popup-config.js',

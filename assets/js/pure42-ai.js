@@ -367,6 +367,7 @@ function pure42_aiChooseTrump(hand, bidAmount) {
 //  PLAY LOGIC — choose_tile_ai replacement for Pure 42
 // ════════════════════════════════════════════════════════════════
 
+
 function pure42_choose_tile_ai(gameState, playerIndex, contract, returnRec, bid) {
   const p = Number(playerIndex);
   const legal = gameState.legal_indices_for_player(p);
@@ -380,318 +381,266 @@ function pure42_choose_tile_ai(gameState, playerIndex, contract, returnRec, bid)
   const trickNum = gameState.trick_number;
   const totalTricks = gameState.hand_size;
   const currentBid = bid || 30;
+  const playerCount = gameState.player_count;
 
   const makeResult = (idx, reason) => {
     if (!returnRec) return idx;
     return { index: idx, tile: hand[idx], reason: reason };
   };
-
   if (legal.length === 0) return makeResult(-1, "No legal moves");
   if (legal.length === 1) return makeResult(legal[0], "Only legal move");
 
+  // ── ROLE DETECTION ──
+  const bidderSeat = (typeof session !== 'undefined' && session.bid_winner_seat !== undefined)
+    ? session.bid_winner_seat : gameState.leader;
+  const bidderTeam = bidderSeat % 2;
+  const iAmBidder = (p === bidderSeat);
+  const iAmPartner = (!iAmBidder && myTeam === bidderTeam);
+  const iAmDefender = (myTeam !== bidderTeam);
+  const iPlayLast = (trick.length === playerCount - 1);
+
+  // ── HELPERS ──
   const isTrump = (t) => gameState._is_trump_tile(t);
   const isDouble = (t) => t[0] === t[1];
-  const isSameTeam = (seat) => seat % 2 === myTeam;
   const tileVal = (t) => t[0] + t[1];
   const isCount = (t) => { const s = t[0]+t[1]; return s === 5 || s === 10; };
+  const countPts = (t) => { const s = t[0]+t[1]; return (s===5||s===10) ? s : 0; };
+  const trumpRank = (t) => { const r = gameState._trump_rank(t); return r[0]*100+r[1]; };
 
-  // ── Played tiles tracking ──
+  // ── PLAYED TILES ──
   const playedSet = new Set();
   const addPlayed = (t) => { if(t) playedSet.add(_p42TileKey(t[0],t[1])); };
-
-  for (let team = 0; team < (gameState.tricks_team || []).length; team++) {
-    for (const record of (gameState.tricks_team[team] || [])) {
-      for (const t of record) { if(t) addPlayed(t); }
-    }
-  }
-  for (const play of trick) { if(Array.isArray(play)) addPlayed(play[1]); }
+  for (let tm = 0; tm < (gameState.tricks_team||[]).length; tm++)
+    for (const rec of (gameState.tricks_team[tm]||[]))
+      for (const t of rec) if(t) addPlayed(t);
+  for (const pl of trick) if(Array.isArray(pl)) addPlayed(pl[1]);
   for (const t of hand) addPlayed(t);
   const isPlayed = (a,b) => playedSet.has(_p42TileKey(a,b));
 
-  // ── Trick winner detection ──
-  let currentWinner = null;
-  let partnerWinning = false;
+  // ── TRICK STATE ──
+  let currentWinner = null, myTeamWinning = false, opponentWinning = false;
+  let trickCountPts = 0;
   if (trick.length > 0) {
-    const winnerSeat = gameState._determine_trick_winner();
-    currentWinner = winnerSeat;
-    partnerWinning = isSameTeam(winnerSeat) && winnerSeat !== p;
+    currentWinner = gameState._determine_trick_winner();
+    myTeamWinning = (currentWinner % 2 === myTeam);
+    opponentWinning = !myTeamWinning;
+    for (const pl of trick) if(Array.isArray(pl)) trickCountPts += countPts(pl[1]);
   }
 
-  // ── Trump analysis ──
-  const trumpsInHand = legal.filter(i => isTrump(hand[i]));
-  const allTrumpsOut = (() => {
-    if (trumpMode === "NONE") return true;
-    if (trumpMode === "PIP") {
-      for (let o = 0; o <= maxPip; o++) {
-        const a = Math.min(trumpSuit, o), b = Math.max(trumpSuit, o);
-        if (!isPlayed(a, b) && !hand.some(h => _p42TileEq(h, [a,b]))) return false;
+  // ── TRUMP TRACKING ──
+  let highestRemainingTrumpRank = -1;
+  let myHighestTrumpRank = -1;
+  if (trumpMode === "PIP" && trumpSuit !== null) {
+    for (let o = 0; o <= maxPip; o++) {
+      const a = Math.min(trumpSuit,o), b = Math.max(trumpSuit,o);
+      if (hand.some(h => _p42TileEq(h,[a,b]))) {
+        const rn = trumpRank([a,b]);
+        if (rn > myHighestTrumpRank) myHighestTrumpRank = rn;
+      } else if (!isPlayed(a,b)) {
+        const rn = trumpRank([a,b]);
+        if (rn > highestRemainingTrumpRank) highestRemainingTrumpRank = rn;
       }
-      return true;
     }
-    if (trumpMode === "DOUBLES") {
-      for (let v = 0; v <= maxPip; v++) {
-        if (!isPlayed(v,v) && !hand.some(h => h[0]===v && h[1]===v)) return false;
-      }
-      return true;
-    }
-    return true;
-  })();
+  }
+  const iHaveHighestTrump = myHighestTrumpRank > highestRemainingTrumpRank;
+  const allTrumpsOut = (highestRemainingTrumpRank === -1) || trumpMode === "NONE";
 
-  // Classify legal tiles
-  const legalTrumpDoubles = [];
-  const legalTrumps = [];
-  const legalDoubles = [];
-  const legalOffs = [];
-
+  // ── CLASSIFY LEGAL TILES ──
+  const ltDouble = [], ltTrump = [], ldDouble = [], ldOff = [];
   for (const idx of legal) {
     const t = hand[idx];
-    const trump = isTrump(t);
-    const dbl = isDouble(t);
-    if (trump && dbl) legalTrumpDoubles.push(idx);
-    else if (trump) legalTrumps.push(idx);
-    else if (dbl) legalDoubles.push(idx);
-    else legalOffs.push(idx);
+    if (isTrump(t) && isDouble(t)) ltDouble.push(idx);
+    else if (isTrump(t)) ltTrump.push(idx);
+    else if (isDouble(t)) ldDouble.push(idx);
+    else ldOff.push(idx);
   }
 
-  // Am I the bidder's team?
-  // Determine bidder from game context
-  const bidderTeam = (() => {
-    // The bidder's team has the higher score target
-    // In Pure 42, the bidder leads first, so leader of trick 0 is the bidder
-    // We don't have direct access, but we can infer from currentBid
-    // For now, assume team with the bid obligation
-    const t0 = gameState.team_points[0];
-    const t1 = gameState.team_points[1];
-    // The team that needs to reach currentBid is the bidder's team
-    // This is imperfect but functional
-    return myTeam; // placeholder — will be improved
-  })();
-  const iAmBidder = true; // simplified — in real game, track who bid
+  // Sort helpers
+  const sortByValAsc = (arr) => arr.slice().sort((a,b) => tileVal(hand[a]) - tileVal(hand[b]));
+  const sortByValDesc = (arr) => arr.slice().sort((a,b) => tileVal(hand[b]) - tileVal(hand[a]));
+  const sortByTrumpAsc = (arr) => arr.slice().sort((a,b) => trumpRank(hand[a]) - trumpRank(hand[b]));
+  const sortByTrumpDesc = (arr) => arr.slice().sort((a,b) => trumpRank(hand[b]) - trumpRank(hand[a]));
+  const nonCountFrom = (arr) => arr.filter(i => !isCount(hand[i]));
+  const countFrom = (arr) => arr.filter(i => isCount(hand[i]));
 
-  // ════════════════════════════════════════════════════════════════
-  //  LEADING
-  // ════════════════════════════════════════════════════════════════
+  // Count threat for a suit (how much count could fall if this suit is led)
+  const suitCountThreat = (pip) => {
+    let threat = 0;
+    for (const ct of P42_COUNT_TILES) {
+      if (ct.suits.includes(pip) && !isTrump(ct.tile) && !isPlayed(ct.tile[0],ct.tile[1])) {
+        if (!hand.some(h => _p42TileEq(h, ct.tile))) threat += ct.pts;
+      }
+    }
+    return threat;
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  //  L E A D I N G
+  // ══════════════════════════════════════════════════════════════
   if (isLead) {
-    // ── Phase 1: Pull trumps (if opponents might have them) ──
-    if (!allTrumpsOut && trumpsInHand.length > 0) {
-      // Lead trump double first
-      if (legalTrumpDoubles.length > 0) {
-        return makeResult(legalTrumpDoubles[0], "P42: Lead trump double (pull trumps)");
+
+    // ─── BIDDER LEAD ───
+    if (iAmBidder) {
+      // 1. Pull trumps
+      if (!allTrumpsOut) {
+        if (ltDouble.length > 0)
+          return makeResult(ltDouble[0], "P42B: trump double (pull)");
+        if (ltTrump.length > 0 && trickNum <= 2) {
+          if (iHaveHighestTrump) {
+            return makeResult(sortByTrumpDesc(ltTrump)[0], "P42B: highest trump (guaranteed, partner donate)");
+          }
+          const nc = nonCountFrom(ltTrump);
+          if (nc.length > 0) return makeResult(sortByValAsc(nc)[0], "P42B: low non-count trump (will lose)");
+          return makeResult(sortByValAsc(ltTrump)[0], "P42B: low trump (no non-count)");
+        }
       }
-      // Lead trump to pull remaining — strategy depends on whether we'll WIN the trick
-      if (legalTrumps.length > 0 && trickNum <= 2) {
-        // Check: do I have the HIGHEST remaining trump?
-        // If so, lead it — guaranteed win, partner can donate count
-        const myTrumpsByRank = legalTrumps.slice().sort((a, b) => {
-          const ra = gameState._trump_rank(hand[a]);
-          const rb = gameState._trump_rank(hand[b]);
-          return (rb[0]*100+rb[1]) - (ra[0]*100+ra[1]);
+      // 2. Double ahead of off
+      for (const dIdx of ldDouble) {
+        const dPip = hand[dIdx][0];
+        if (ldOff.some(i => Math.max(hand[i][0],hand[i][1]) === dPip)) {
+          return makeResult(dIdx, "P42B: double ahead of off (" + dPip + "-suit)");
+        }
+      }
+      // 3. Dump offs (highest risk first)
+      if (ldOff.length > 0) {
+        const scored = ldOff.map(i => ({ i, r: countPts(hand[i]) + suitCountThreat(Math.max(hand[i][0],hand[i][1])) }));
+        scored.sort((a,b) => b.r - a.r);
+        return makeResult(scored[0].i, "P42B: dump off (risk=" + scored[0].r + ")");
+      }
+      // 4. Lead doubles (count-heavy first)
+      if (ldDouble.length > 0) {
+        const scored = ldDouble.map(i => ({ i, cv: countPts(hand[i]) + suitCountThreat(hand[i][0]) }));
+        scored.sort((a,b) => b.cv - a.cv);
+        return makeResult(scored[0].i, "P42B: double (count=" + scored[0].cv + ")");
+      }
+      // 5. Remaining trump
+      if (ltTrump.length > 0) return makeResult(sortByValAsc(ltTrump)[0], "P42B: last trump");
+    }
+
+    // ─── PARTNER LEAD ───
+    if (iAmPartner) {
+      // Lead doubles (count-calling preferred). NEVER lead trump. Lead away from count if no doubles.
+      if (ldDouble.length > 0) {
+        const scored = ldDouble.map(i => ({ i, cv: suitCountThreat(hand[i][0]) }));
+        scored.sort((a,b) => b.cv - a.cv);
+        return makeResult(scored[0].i, "P42P: double (count=" + scored[0].cv + ")");
+      }
+      // No doubles — lead AWAY from count (lowest risk)
+      const allNonTrump = [...ldOff];
+      if (allNonTrump.length > 0) {
+        const scored = allNonTrump.map(i => ({ i, r: countPts(hand[i]) + suitCountThreat(Math.max(hand[i][0],hand[i][1])) }));
+        scored.sort((a,b) => a.r - b.r); // lowest risk first
+        return makeResult(scored[0].i, "P42P: away from count (risk=" + scored[0].r + ")");
+      }
+      // Last resort: trump (book says avoid)
+      if (ltTrump.length > 0) return makeResult(sortByValAsc(ltTrump)[0], "P42P: trump (last resort)");
+      if (ltDouble.length > 0) return makeResult(ltDouble[0], "P42P: trump double (last resort)");
+    }
+
+    // ─── DEFENDER LEAD ───
+    if (iAmDefender) {
+      // Lead tiles that call for count. Don't lead count itself. Don't lead doubles without count threat.
+      const allLeads = [...ldDouble, ...ldOff, ...ltTrump, ...ltDouble];
+      if (allLeads.length > 0) {
+        const scored = allLeads.map(i => {
+          const t = hand[i];
+          let score = suitCountThreat(Math.max(t[0],t[1]));
+          if (isDouble(t)) score += 3; // doubles help win tricks
+          if (isCount(t)) score -= 25; // never lead your own count
+          if (isTrump(t)) score -= 15; // avoid leading trump
+          return { i, score };
         });
-
-        // Check if my highest non-double trump beats all remaining unplayed trumps
-        const myHighestRank = gameState._trump_rank(hand[myTrumpsByRank[0]]);
-        const myHighestRankNum = myHighestRank[0] * 100 + myHighestRank[1];
-
-        // Find highest remaining trump NOT in my hand and NOT yet played
-        let highestRemainingRankNum = -1;
-        if (trumpMode === "PIP" && trumpSuit !== null) {
-          for (let o = 0; o <= maxPip; o++) {
-            const a = Math.min(trumpSuit, o), b = Math.max(trumpSuit, o);
-            if (a === b) continue; // skip double (already played or in trumpDoubles)
-            const inHand = hand.some(h => _p42TileEq(h, [a,b]));
-            if (inHand) continue;
-            if (isPlayed(a, b)) continue;
-            const r = gameState._trump_rank([a, b]);
-            const rn = r[0] * 100 + r[1];
-            if (rn > highestRemainingRankNum) highestRemainingRankNum = rn;
-          }
-        }
-
-        const iHaveHighest = myHighestRankNum > highestRemainingRankNum;
-
-        if (iHaveHighest) {
-          // I WILL win this trick — lead my highest trump
-          // Partner knows it's safe to donate count
-          return makeResult(myTrumpsByRank[0], "P42: Lead highest trump (guaranteed win, partner can donate count)");
-        } else {
-          // I'll likely LOSE this trick — lead lowest non-count trump to minimize damage
-          const nonCountTrumps = legalTrumps.filter(i => !isCount(hand[i]));
-          const countTrumps = legalTrumps.filter(i => isCount(hand[i]));
-
-          if (nonCountTrumps.length > 0) {
-            nonCountTrumps.sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
-            return makeResult(nonCountTrumps[0], "P42: Lead low non-count trump (will lose, protect count)");
-          }
-          if (countTrumps.length > 0) {
-            // Only count trumps — lead lowest count (minimize loss)
-            countTrumps.sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
-            return makeResult(countTrumps[0], "P42: Lead low count trump (no non-count available)");
-          }
-        }
+        scored.sort((a,b) => b.score - a.score);
+        return makeResult(scored[0].i, "P42D: lead (threat=" + scored[0].score + ")");
       }
     }
 
-    // ── Phase 2: Double ahead of off ──
-    // If I have a double + an off in the same suit, lead the double first
-    for (const dIdx of legalDoubles) {
-      const dPip = hand[dIdx][0]; // double pip
-      const matchingOff = legalOffs.find(oIdx => {
-        const off = hand[oIdx];
-        return Math.max(off[0], off[1]) === dPip;
-      });
-      if (matchingOff !== undefined) {
-        // Check if this suit has count tiles not yet played
-        let suitHasCount = false;
-        for (const ct of P42_COUNT_TILES) {
-          if (ct.suits.includes(dPip) && !isTrump(ct.tile) && !isPlayed(ct.tile[0], ct.tile[1])) {
-            if (!hand.some(h => _p42TileEq(h, ct.tile))) {
-              suitHasCount = true;
-              break;
-            }
-          }
-        }
-        if (suitHasCount) {
-          return makeResult(dIdx, "P42: Double ahead of off (pull count from " + dPip + "-suit)");
-        }
-      }
-    }
-
-    // ── Phase 3: Dump offs (as early as possible) ──
-    if (legalOffs.length > 0) {
-      // Sort offs by risk (highest risk first — get rid of dangerous offs)
-      const offScored = legalOffs.map(idx => {
-        const off = hand[idx];
-        const highPip = Math.max(off[0], off[1]);
-        let risk = 0;
-        for (const ct of P42_COUNT_TILES) {
-          if (ct.suits.includes(highPip) && !isTrump(ct.tile)) {
-            if (!hand.some(h => _p42TileEq(h, ct.tile)) && !isPlayed(ct.tile[0], ct.tile[1])) {
-              risk += ct.pts;
-            }
-          }
-        }
-        return { idx, risk };
-      });
-      offScored.sort((a, b) => b.risk - a.risk);
-
-      // Keep at least 1 trump for get-back-in (if we still have offs after this)
-      if (trumpsInHand.length > 0 || allTrumpsOut) {
-        return makeResult(offScored[0].idx, "P42: Dump off (risk=" + offScored[0].risk + ")");
-      }
-    }
-
-    // ── Phase 4: Lead doubles (count-heavy suits first) ──
-    if (legalDoubles.length > 0) {
-      const dblScored = legalDoubles.map(idx => {
-        const dPip = hand[idx][0];
-        let countValue = 0;
-        for (const ct of P42_COUNT_TILES) {
-          if (ct.suits.includes(dPip) && !isTrump(ct.tile)) {
-            if (!isPlayed(ct.tile[0], ct.tile[1]) && !hand.some(h => _p42TileEq(h, ct.tile))) {
-              countValue += ct.pts;
-            }
-          }
-        }
-        // Also add count if the double itself is count
-        if (isCount(hand[idx])) countValue += tileVal(hand[idx]);
-        return { idx, countValue };
-      });
-      dblScored.sort((a, b) => b.countValue - a.countValue);
-      return makeResult(dblScored[0].idx, "P42: Lead double (count pull=" + dblScored[0].countValue + ")");
-    }
-
-    // ── Fallback: lead lowest trump ──
-    if (legalTrumps.length > 0) {
-      const sorted = legalTrumps.slice().sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
-      return makeResult(sorted[0], "P42: Lead low trump (fallback)");
-    }
-
-    return makeResult(legal[0], "P42: Lead (no better option)");
+    return makeResult(legal[0], "P42: lead fallback");
   }
 
-  // ════════════════════════════════════════════════════════════════
-  //  FOLLOWING SUIT / PLAYING ON A TRICK
-  // ════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════
+  //  F O L L O W I N G
+  // ══════════════════════════════════════════════════════════════
 
-  // ── Partner is winning → play low, or donate count if guaranteed ──
-  if (partnerWinning) {
-    // Check if partner is GUARANTEED to win (led double or highest trump)
-    // Simple heuristic: if no one after me can beat partner, it's guaranteed
-    const trickPlaysRemaining = gameState.active_players.length - trick.length - 1;
-    const partnerGuaranteed = trickPlaysRemaining === 0; // I'm last to play
-
-    if (partnerGuaranteed || trick.length >= 3) {
-      // Play count if I have it (donate to partner's winning trick)
-      const countLegal = legal.filter(i => isCount(hand[i]));
-      if (countLegal.length > 0) {
-        // Play highest count
-        countLegal.sort((a, b) => tileVal(hand[b]) - tileVal(hand[a]));
-        return makeResult(countLegal[0], "P42: Donate count to partner (" + tileVal(hand[countLegal[0]]) + "pts)");
+  // ─── MY TEAM IS WINNING ───
+  if (myTeamWinning) {
+    // Partner/bidder winning — donate count if safe, else play low
+    if (iPlayLast) {
+      // I'm last — guaranteed winner is known. Donate count!
+      const cl = countFrom(legal).filter(i => !isTrump(hand[i]));
+      if (cl.length > 0) {
+        return makeResult(sortByValDesc(cl)[0], "P42: donate " + countPts(hand[sortByValDesc(cl)[0]]) + "pts (last, safe)");
+      }
+    } else {
+      // Not last — only donate if leader played double or highest trump
+      const leaderTile = trick.length > 0 && Array.isArray(trick[0]) ? trick[0][1] : null;
+      if (leaderTile && (isDouble(leaderTile) || (isTrump(leaderTile) && trumpRank(leaderTile) >= myHighestTrumpRank))) {
+        const cl = countFrom(legal).filter(i => !isTrump(hand[i]));
+        if (cl.length > 0) {
+          return makeResult(sortByValDesc(cl)[0], "P42: donate count (leader has double/high trump)");
+        }
       }
     }
-    // Play lowest
-    const sorted = legal.slice().sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
-    return makeResult(sorted[0], "P42: Partner winning, play low");
+    // Play low, prefer non-count
+    const nc = nonCountFrom(legal);
+    return makeResult(sortByValAsc(nc.length > 0 ? nc : legal)[0], "P42: team winning, play low");
   }
 
-  // ── Can I win this trick? ──
-  const canWin = (() => {
-    // Check if any of my legal tiles can beat the current winner
-    for (const idx of legal) {
-      // This is complex to evaluate without replaying the trick logic
-      // Simplified: if I have a higher trump or higher in-suit tile
-      if (isTrump(hand[idx]) && !legal.every(i => isTrump(hand[i]))) {
-        return true; // I can trump in
+  // ─── OPPONENT IS WINNING ───
+  if (opponentWinning) {
+
+    // == DEFENDER: opponent = bidder is winning ==
+    if (iAmDefender) {
+      // Can I win? (double of led suit, or trump in)
+      const ledSuit = gameState._led_suit_for_trick();
+      let winIdx = -1;
+      // Check for double of led suit
+      for (const idx of legal) {
+        if (isDouble(hand[idx]) && !isTrump(hand[idx]) && hand[idx][0] === ledSuit) { winIdx = idx; break; }
       }
-    }
-    return true; // assume possible
-  })();
+      // Check for trump-in
+      if (winIdx < 0) {
+        for (const idx of legal) { if (isTrump(hand[idx])) { winIdx = idx; break; } }
+      }
+      if (winIdx >= 0) return makeResult(winIdx, "P42D: pounce (win trick)");
 
-  // ── Opponent is winning — try to beat them ──
-  if (currentWinner !== null && !isSameTeam(currentWinner)) {
-    // Defense: if I'm defending and can win, do so
-    // If I have the double of the led suit, play it (pounce!)
-    const ledSuit = gameState._led_suit_for_trick();
-
-    // Try to play highest legal tile to win
-    const sorted = legal.slice().sort((a, b) => {
-      // Prefer trumps over non-trumps
-      const aTrump = isTrump(hand[a]) ? 1 : 0;
-      const bTrump = isTrump(hand[b]) ? 1 : 0;
-      if (aTrump !== bTrump) return bTrump - aTrump;
-      // Prefer doubles (they win the suit)
-      const aDbl = isDouble(hand[a]) ? 1 : 0;
-      const bDbl = isDouble(hand[b]) ? 1 : 0;
-      if (aDbl !== bDbl) return bDbl - aDbl;
-      // Prefer higher tiles
-      return tileVal(hand[b]) - tileVal(hand[a]);
-    });
-
-    // But don't waste count trumping a worthless trick
-    const trickHasCount = trick.some(play => {
-      if (!Array.isArray(play)) return false;
-      const t = play[1];
-      return isCount(t);
-    });
-
-    if (trickHasCount || trickNum >= totalTricks - 2) {
-      // Trick has count or it's late game — play to win
-      return makeResult(sorted[0], "P42: Play high to win (opponent leading)");
+      // Can't win. Throw count or save it?
+      if (iPlayLast) {
+        // LAST to play. Partner already couldn't win. DON'T throw count.
+        const nc = nonCountFrom(legal);
+        return makeResult(sortByValAsc(nc.length > 0 ? nc : legal)[0], "P42D: last, partner lost, save count");
+      }
+      // NOT last — partner might still win. "Play it or lose it!"
+      const cl = countFrom(legal);
+      if (cl.length > 0) {
+        return makeResult(sortByValDesc(cl)[0], "P42D: pounce count (" + countPts(hand[sortByValDesc(cl)[0]]) + "pts, play it or lose it)");
+      }
+      // No count — throw low, create void
+      return makeResult(sortByValAsc(legal)[0], "P42D: no count, play low");
     }
 
-    // If trick is low value and I'd have to spend count to win, play low instead
-    const bestTile = hand[sorted[0]];
-    if (isCount(bestTile) && !trickHasCount) {
-      // Playing count to win a 1-point trick — might not be worth it
-      // Play lowest instead
-      const lowSorted = legal.slice().sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
-      return makeResult(lowSorted[0], "P42: Save count, play low");
+    // == BIDDER/PARTNER: opponent winning, try to take it back ==
+    // Trump in if count is at stake
+    const trumpLegal = legal.filter(i => isTrump(hand[i]));
+    if (trumpLegal.length > 0 && trickCountPts > 0) {
+      return makeResult(sortByTrumpAsc(trumpLegal)[0], "P42: trump in (protect " + trickCountPts + "pts count)");
     }
-
-    return makeResult(sorted[0], "P42: Play to win trick");
+    // Try to win in-suit with highest
+    const nonCount = nonCountFrom(legal);
+    const high = sortByValDesc(nonCount.length > 0 ? nonCount : legal);
+    if (high.length > 0) return makeResult(high[0], "P42: play high to contest");
+    return makeResult(sortByValAsc(legal)[0], "P42: can't win, play low");
   }
 
-  // ── Default: play lowest ──
-  const sorted = legal.slice().sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
-  return makeResult(sorted[0], "P42: Play low (default)");
+  // ─── FOLLOWING TRUMP SUIT (forced to follow) ───
+  if (!isLead && gameState._led_suit_for_trick() === -1) {
+    if (iAmDefender) {
+      // Defender: play LOWEST trump — save high for tricks you can win
+      return makeResult(sortByTrumpAsc(legal)[0], "P42D: follow trump, play lowest (save high)");
+    }
+  }
+
+  // ─── DEFAULT ───
+  const nc = nonCountFrom(legal);
+  return makeResult(sortByValAsc(nc.length > 0 ? nc : legal)[0], "P42: default play low");
 }

@@ -442,15 +442,31 @@ function pure42_choose_tile_ai(gameState, playerIndex, contract, returnRec, bid)
       if (legalTrumpDoubles.length > 0) {
         return makeResult(legalTrumpDoubles[0], "P42: Lead trump double (pull trumps)");
       }
-      // Lead highest trump
+      // Lead LOWEST NON-COUNT trump to pull remaining
+      // Book strategy: you'll likely lose this trick, so minimize what you lose
+      // Lead non-count trump first. Only lead count trump if that's all you have.
       if (legalTrumps.length > 0 && trickNum <= 2) {
-        // Sort by trump rank descending
-        const sorted = legalTrumps.slice().sort((a, b) => {
-          const ra = gameState._trump_rank(hand[a]);
-          const rb = gameState._trump_rank(hand[b]);
-          return (rb[0]*100+rb[1]) - (ra[0]*100+ra[1]);
-        });
-        return makeResult(sorted[0], "P42: Lead high trump (pull remaining)");
+        // Separate count trumps from non-count trumps
+        const nonCountTrumps = legalTrumps.filter(i => !isCount(hand[i]));
+        const countTrumps = legalTrumps.filter(i => isCount(hand[i]));
+
+        if (nonCountTrumps.length > 0) {
+          // Lead lowest non-count trump (minimize loss)
+          nonCountTrumps.sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
+          return makeResult(nonCountTrumps[0], "P42: Lead low non-count trump (pull, protect count)");
+        }
+        // Only count trumps left — check if I have the highest trump (safe to lead)
+        if (countTrumps.length > 0) {
+          // Sort by rank descending — if I have the highest, it's safe to lead
+          countTrumps.sort((a, b) => {
+            const ra = gameState._trump_rank(hand[a]);
+            const rb = gameState._trump_rank(hand[b]);
+            return (rb[0]*100+rb[1]) - (ra[0]*100+ra[1]);
+          });
+          // Lead highest count trump only if it's guaranteed to win
+          // Otherwise save it — don't risk count
+          return makeResult(countTrumps[0], "P42: Lead count trump (only trumps left, careful)");
+        }
       }
     }
 

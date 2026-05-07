@@ -442,30 +442,55 @@ function pure42_choose_tile_ai(gameState, playerIndex, contract, returnRec, bid)
       if (legalTrumpDoubles.length > 0) {
         return makeResult(legalTrumpDoubles[0], "P42: Lead trump double (pull trumps)");
       }
-      // Lead LOWEST NON-COUNT trump to pull remaining
-      // Book strategy: you'll likely lose this trick, so minimize what you lose
-      // Lead non-count trump first. Only lead count trump if that's all you have.
+      // Lead trump to pull remaining — strategy depends on whether we'll WIN the trick
       if (legalTrumps.length > 0 && trickNum <= 2) {
-        // Separate count trumps from non-count trumps
-        const nonCountTrumps = legalTrumps.filter(i => !isCount(hand[i]));
-        const countTrumps = legalTrumps.filter(i => isCount(hand[i]));
+        // Check: do I have the HIGHEST remaining trump?
+        // If so, lead it — guaranteed win, partner can donate count
+        const myTrumpsByRank = legalTrumps.slice().sort((a, b) => {
+          const ra = gameState._trump_rank(hand[a]);
+          const rb = gameState._trump_rank(hand[b]);
+          return (rb[0]*100+rb[1]) - (ra[0]*100+ra[1]);
+        });
 
-        if (nonCountTrumps.length > 0) {
-          // Lead lowest non-count trump (minimize loss)
-          nonCountTrumps.sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
-          return makeResult(nonCountTrumps[0], "P42: Lead low non-count trump (pull, protect count)");
+        // Check if my highest non-double trump beats all remaining unplayed trumps
+        const myHighestRank = gameState._trump_rank(hand[myTrumpsByRank[0]]);
+        const myHighestRankNum = myHighestRank[0] * 100 + myHighestRank[1];
+
+        // Find highest remaining trump NOT in my hand and NOT yet played
+        let highestRemainingRankNum = -1;
+        if (trumpMode === "PIP" && trumpSuit !== null) {
+          for (let o = 0; o <= maxPip; o++) {
+            const a = Math.min(trumpSuit, o), b = Math.max(trumpSuit, o);
+            if (a === b) continue; // skip double (already played or in trumpDoubles)
+            const inHand = hand.some(h => _p42TileEq(h, [a,b]));
+            if (inHand) continue;
+            if (isPlayed(a, b)) continue;
+            const r = gameState._trump_rank([a, b]);
+            const rn = r[0] * 100 + r[1];
+            if (rn > highestRemainingRankNum) highestRemainingRankNum = rn;
+          }
         }
-        // Only count trumps left — check if I have the highest trump (safe to lead)
-        if (countTrumps.length > 0) {
-          // Sort by rank descending — if I have the highest, it's safe to lead
-          countTrumps.sort((a, b) => {
-            const ra = gameState._trump_rank(hand[a]);
-            const rb = gameState._trump_rank(hand[b]);
-            return (rb[0]*100+rb[1]) - (ra[0]*100+ra[1]);
-          });
-          // Lead highest count trump only if it's guaranteed to win
-          // Otherwise save it — don't risk count
-          return makeResult(countTrumps[0], "P42: Lead count trump (only trumps left, careful)");
+
+        const iHaveHighest = myHighestRankNum > highestRemainingRankNum;
+
+        if (iHaveHighest) {
+          // I WILL win this trick — lead my highest trump
+          // Partner knows it's safe to donate count
+          return makeResult(myTrumpsByRank[0], "P42: Lead highest trump (guaranteed win, partner can donate count)");
+        } else {
+          // I'll likely LOSE this trick — lead lowest non-count trump to minimize damage
+          const nonCountTrumps = legalTrumps.filter(i => !isCount(hand[i]));
+          const countTrumps = legalTrumps.filter(i => isCount(hand[i]));
+
+          if (nonCountTrumps.length > 0) {
+            nonCountTrumps.sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
+            return makeResult(nonCountTrumps[0], "P42: Lead low non-count trump (will lose, protect count)");
+          }
+          if (countTrumps.length > 0) {
+            // Only count trumps — lead lowest count (minimize loss)
+            countTrumps.sort((a, b) => tileVal(hand[a]) - tileVal(hand[b]));
+            return makeResult(countTrumps[0], "P42: Lead low count trump (no non-count available)");
+          }
         }
       }
     }

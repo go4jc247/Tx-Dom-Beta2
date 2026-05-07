@@ -11107,6 +11107,7 @@ function parseCustomHandText(t) { return null; }
 function startCustomHand() { _lazyLoad("./assets/js/dev-tools.js", function(){ startCustomHand(); }); }
 // Game logging stubs — no-op until dev-tools loaded
 var _gameLog = []; var _advLog = [];
+var gameLog = _gameLog; var advLog = _advLog;
 var handNumber = 0; var trickNumber = 0; var currentTrickPlays = [];
 var _gameLogTab = 'full'; var _advLogTab = 'full';
 function logHandStart() {}

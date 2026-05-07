@@ -2078,8 +2078,8 @@ var BUILTIN_DEVICE_PRESETS = {
 // V12: Screen name is now inline on start screen — no popup needed
 // updateScreenNameUI() is called in the IIFE above
 
-// Show start screen on load
-showStartScreen();
+// NOTE: showStartScreen() removed — dev-tools.js is lazy-loaded during gameplay,
+// calling showStartScreen() here would exit the game back to home screen.
 
 // Service Worker registration moved to index.html (always loads, not lazy)
 

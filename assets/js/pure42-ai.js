@@ -159,11 +159,20 @@ function pure42_evaluateHandForBid(hand) {
     }
 
     let trumpRisk = 0;
-    if (topTrumpsHeld >= 2) {
-      // We have top 2+ trumps — safe, we control trump
+    if (hasDoubleTrump && trumpCount >= 3) {
+      // Have the double + 2 more trumps. Leading the double forces all opponents
+      // to play their trumps. After that, our remaining 2+ trumps are likely highest.
+      // Book: "You can easily pull in the other trumps" — risk is minimal.
+      // Risk: might lose 1 trick to the second-highest trump (which we may not have)
+      // but with 3+ trumps total it's manageable.
+      trumpRisk = 1; // lose at most 1 trump trick
+    } else if (hasDoubleTrump && trumpCount === 3 && topTrumpsHeld >= 2) {
+      // Have double + second highest + one more. Very safe.
       trumpRisk = 0;
-    } else if (topTrumpsHeld === 1) {
-      // We have the double but not second highest — will lose 1 trump trick
+    } else if (topTrumpsHeld >= 2) {
+      trumpRisk = 0;
+    } else if (hasDoubleTrump) {
+      // Have the double but only 2 trumps total — less control
       trumpRisk = 1;
       for (const ct of P42_COUNT_TILES) {
         const isTrump = ct.tile[0] === trumpPip || ct.tile[1] === trumpPip;

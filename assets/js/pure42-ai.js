@@ -572,9 +572,13 @@ function pure42_choose_tile_ai(gameState, playerIndex, contract, returnRec, bid)
         return makeResult(sortByValDesc(cl)[0], "P42: donate " + countPts(hand[sortByValDesc(cl)[0]]) + "pts (last, safe)");
       }
     } else {
-      // Not last — only donate if leader played double or highest trump
+      // Not last — only donate if leader played double or THE highest remaining trump
       const leaderTile = trick.length > 0 && Array.isArray(trick[0]) ? trick[0][1] : null;
-      if (leaderTile && (isDouble(leaderTile) || (isTrump(leaderTile) && trumpRank(leaderTile) >= myHighestTrumpRank))) {
+      const leaderPlayedGuaranteed = leaderTile && (
+        isDouble(leaderTile) ||
+        (isTrump(leaderTile) && trumpRank(leaderTile) > highestRemainingTrumpRank)
+      );
+      if (leaderPlayedGuaranteed) {
         const cl = countFrom(legal).filter(i => !isTrump(hand[i]));
         if (cl.length > 0) {
           return makeResult(sortByValDesc(cl)[0], "P42: donate count (leader has double/high trump)");

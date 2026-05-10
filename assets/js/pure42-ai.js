@@ -281,10 +281,20 @@ function pure42_evaluateHandForBid(hand) {
     }
 
     // Partner help: with 2+ offs, expect partner to win 1 trick
-    // But be conservative — only deduct up to 1 trick's worth (6 points)
-    // and only if offs are moderate risk (don't help when everything is deadly)
-    if (offs.length >= 2 && offs.length <= 3 && nonTrumpDoubles.length >= 1) {
-      totalOffRisk = Math.max(0, totalOffRisk - 6);
+    // But only give full help with 4+ trumps. With 3 trumps, be more conservative.
+    if (offs.length >= 2 && nonTrumpDoubles.length >= 1) {
+      const helpAmount = (trumpCount >= 4) ? 6 : 3;
+      totalOffRisk = Math.max(0, totalOffRisk - helpAmount);
+    }
+
+    // Strong hand bonus: 4+ trumps with double + 2+ non-trump doubles = very strong control
+    // You control 6+ tricks, off risk is mitigated because you choose WHEN to play it
+    if (trumpCount >= 4 && hasDoubleTrump && nonTrumpDoubles.length >= 2 && offs.length <= 1) {
+      totalOffRisk = Math.max(0, Math.ceil(totalOffRisk * 0.4)); // off risk greatly reduced
+    }
+    // 4+ trumps with double + 1 off + 1 non-trump double — strong but not dominant
+    else if (trumpCount >= 4 && hasDoubleTrump && nonTrumpDoubles.length >= 1 && offs.length === 1) {
+      totalOffRisk = Math.max(0, totalOffRisk - 5); // moderate reduction
     }
 
     const totalRisk = trumpRisk + totalOffRisk;

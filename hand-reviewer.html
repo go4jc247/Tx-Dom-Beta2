@@ -148,12 +148,8 @@ h1 { font-size: 18px; text-align: center; margin-bottom: 8px; color: #eab308; }
 </div>
 
 <div id="handArea"></div>
-<div id="resultsPanel" style="display:none">
-  <h2>AI Analysis</h2>
-  <div id="resultsContent"></div>
-</div>
 
-<div id="annotationArea" style="display:none">
+<div id="resultsPanel" style="display:none">
   <div id="starRating" style="display:flex;justify-content:center;gap:8px;margin:8px 0;flex-wrap:wrap">
     <div style="background:#ef4444;border-radius:8px;padding:6px 10px;text-align:center;min-width:90px" onmouseleave="previewStars(0)">
       <div style="font-size:11px;font-weight:700;color:#fff;margin-bottom:2px">WRONG</div>
@@ -170,10 +166,16 @@ h1 { font-size: 18px; text-align: center; margin-bottom: 8px; color: #eab308; }
       <span class="star" onclick="submitRating(5)" onmouseenter="previewStars(5)" ontouchstart="previewStars(5)" style="cursor:pointer;font-size:40px;color:rgba(255,255,255,0.4)">&#9733;</span>
     </div>
   </div>
+
   <div style="text-align:center;margin:6px 0">
     <button class="btn-random" onclick="randomHand()">Next Random</button>
   </div>
-  <input type="text" id="noteInput" placeholder="Notes (optional)...">
+
+  <input type="text" id="noteInput" placeholder="Notes (optional)..." style="margin-top:6px">
+
+  <h2 style="margin-top:12px">AI Analysis</h2>
+  <div id="resultsContent"></div>
+
   <div style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap">
     <button class="btn-clear" onclick="browseAnnotation(-1)" style="padding:5px 12px;font-size:13px">&lt; Prev</button>
     <span id="historyCount" style="font-size:12px;color:#94a3b8">0</span><span style="font-size:12px;color:#64748b"> annotations</span>
@@ -182,6 +184,7 @@ h1 { font-size: 18px; text-align: center; margin-bottom: 8px; color: #eab308; }
     <button class="btn-import" onclick="document.getElementById('importFile').click()" style="padding:5px 10px;font-size:11px">Import</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importAnnotations(event)">
   </div>
+
   <div id="historyList" style="margin-top:8px"></div>
 </div>
 
@@ -892,7 +895,7 @@ function runAnalysis(){
   const panel = document.getElementById('resultsPanel');
   const content = document.getElementById('resultsContent');
   panel.style.display = 'block';
-  document.getElementById('annotationArea').style.display = 'block';
+  // annotations now inside resultsPanel
 
   // Run pure42 bidding
   let result;
@@ -1003,7 +1006,7 @@ function runAnalysis(){
 
 function hideResults(){
   document.getElementById('resultsPanel').style.display = 'none';
-  document.getElementById('annotationArea').style.display = 'none';
+  // annotations now inside resultsPanel
 }
 
 // ============================================================

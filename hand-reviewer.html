@@ -154,22 +154,30 @@ h1 { font-size: 18px; text-align: center; margin-bottom: 8px; color: #eab308; }
 </div>
 
 <div id="annotationArea" style="display:none">
-  <button class="btn-correct" onclick="annotate('correct')">Correct</button>
-  <button class="btn-wrong" onclick="annotate('wrong')">Wrong</button>
-  <button class="btn-random" onclick="randomHand()">Next Random</button>
-  <br>
+  <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:6px">
+    <button class="btn-correct" onclick="annotate('correct')">Correct</button>
+    <button class="btn-wrong" onclick="annotate('wrong')">Wrong</button>
+    <button class="btn-random" onclick="randomHand()">Next Random</button>
+  </div>
+  <div id="starRating" style="text-align:center;margin:6px 0">
+    <span style="font-size:12px;color:#94a3b8">Rating: </span>
+    <span class="star" onclick="setRating(1)" style="cursor:pointer;font-size:22px;color:#475569">&#9733;</span>
+    <span class="star" onclick="setRating(2)" style="cursor:pointer;font-size:22px;color:#475569">&#9733;</span>
+    <span class="star" onclick="setRating(3)" style="cursor:pointer;font-size:22px;color:#475569">&#9733;</span>
+    <span class="star" onclick="setRating(4)" style="cursor:pointer;font-size:22px;color:#475569">&#9733;</span>
+    <span class="star" onclick="setRating(5)" style="cursor:pointer;font-size:22px;color:#475569">&#9733;</span>
+    <span id="ratingLabel" style="font-size:11px;color:#94a3b8;margin-left:4px"></span>
+  </div>
   <input type="text" id="noteInput" placeholder="Notes (optional)...">
-</div>
-
-<div id="historyPanel">
-  <h3>Annotations (<span id="historyCount">0</span>)
-    <button class="btn-clear" onclick="browseAnnotation(-1)" style="padding:4px 10px;font-size:12px;margin-left:8px">&lt; Prev</button>
-    <button class="btn-clear" onclick="browseAnnotation(1)" style="padding:4px 10px;font-size:12px">&gt; Next</button>
-    <button class="btn-export" onclick="exportAnnotations()" style="padding:4px 10px;font-size:12px;margin-left:8px">Export</button>
-    <button class="btn-import" onclick="document.getElementById('importFile').click()" style="padding:4px 10px;font-size:12px">Import</button>
+  <div style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap">
+    <button class="btn-clear" onclick="browseAnnotation(-1)" style="padding:5px 12px;font-size:13px">&lt; Prev</button>
+    <span id="historyCount" style="font-size:12px;color:#94a3b8">0</span><span style="font-size:12px;color:#64748b"> annotations</span>
+    <button class="btn-clear" onclick="browseAnnotation(1)" style="padding:5px 12px;font-size:13px">Next &gt;</button>
+    <button class="btn-export" onclick="exportAnnotations()" style="padding:5px 10px;font-size:11px">Export</button>
+    <button class="btn-import" onclick="document.getElementById('importFile').click()" style="padding:5px 10px;font-size:11px">Import</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importAnnotations(event)">
-  </h3>
-  <div id="historyList"></div>
+  </div>
+  <div id="historyList" style="margin-top:8px"></div>
 </div>
 
 <script>
@@ -1015,17 +1023,30 @@ function annotate(verdict){
     normalBid: range ? range.normalBid : null,
     riskyBid: range ? range.riskyBid : null,
     verdict: verdict,
+    rating: currentRating || null,
     note: note,
     timestamp: new Date().toISOString()
   };
   annotations.push(entry);
   localStorage.setItem('hr_annotations', JSON.stringify(annotations));
   document.getElementById('noteInput').value = '';
+  setRating(0); // reset stars
   renderHistory();
   runAnalysis(); // refresh display to show the new annotation inline
 }
 
 let browseIndex = -1; // -1 = not browsing
+let currentRating = 0; // 0 = no rating, 1-5 stars
+
+function setRating(n){
+  currentRating = (currentRating === n) ? 0 : n; // tap same star to clear
+  const stars = document.querySelectorAll('#starRating .star');
+  const labels = ['','Bad','Poor','OK','Good','Perfect'];
+  for(let i = 0; i < stars.length; i++){
+    stars[i].style.color = i < currentRating ? '#eab308' : '#475569';
+  }
+  document.getElementById('ratingLabel').textContent = labels[currentRating] || '';
+}
 
 function renderHistory(){
   document.getElementById('historyCount').textContent = annotations.length;
@@ -1042,7 +1063,7 @@ function renderHistory(){
   const trumpStr = a.userTrump !== null && a.userTrump !== undefined ? a.userTrump : (a.aiTrump || '?');
   list.innerHTML = `<div class="history-item ${a.verdict}" style="cursor:pointer" onclick="loadAnnotation(${idx})">
     <div style="color:#64748b;font-size:11px;margin-bottom:2px">${idx + 1} of ${annotations.length}${a.handNum ? ' — Hand #' + a.handNum.toLocaleString() : ''}</div>
-    <strong>${a.verdict.toUpperCase()}</strong> — Bid: ${a.aiBid}${rangeStr}, Trump: ${trumpStr}
+    <strong>${a.verdict.toUpperCase()}</strong>${a.rating ? ' ' + '★'.repeat(a.rating) + '☆'.repeat(5-a.rating) : ''} — Bid: ${a.aiBid}${rangeStr}, Trump: ${trumpStr}
     <br><small>${handStr}</small>
     ${a.note ? '<div style="color:#cbd5e1;font-style:italic;margin-top:4px;max-height:80px;overflow-y:auto;font-size:11px;line-height:1.4">' + a.note + '</div>' : ''}
     <div style="color:#64748b;font-size:10px;margin-top:4px">Tap to load this hand</div>
@@ -1142,6 +1163,7 @@ function clearHand(){
 // ============================================================
 buildPicker();
 renderHistory();
+randomHand(); // auto-load a random hand on page open
 </script>
 
 <!-- Load actual Pure 42 AI engine -->

@@ -1044,7 +1044,7 @@ function renderHistory(){
     <div style="color:#64748b;font-size:11px;margin-bottom:2px">${idx + 1} of ${annotations.length}${a.handNum ? ' — Hand #' + a.handNum.toLocaleString() : ''}</div>
     <strong>${a.verdict.toUpperCase()}</strong> — Bid: ${a.aiBid}${rangeStr}, Trump: ${trumpStr}
     <br><small>${handStr}</small>
-    ${a.note ? '<br><em style="color:#cbd5e1">' + a.note + '</em>' : ''}
+    ${a.note ? '<div style="color:#cbd5e1;font-style:italic;margin-top:4px;max-height:80px;overflow-y:auto;font-size:11px;line-height:1.4">' + a.note + '</div>' : ''}
     <div style="color:#64748b;font-size:10px;margin-top:4px">Tap to load this hand</div>
   </div>`;
 }

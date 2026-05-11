@@ -159,14 +159,16 @@ h1 { font-size: 18px; text-align: center; margin-bottom: 8px; color: #eab308; }
   <button class="btn-random" onclick="randomHand()">Next Random</button>
   <br>
   <input type="text" id="noteInput" placeholder="Notes (optional)...">
-  <br><br>
-  <button class="btn-export" onclick="exportAnnotations()">Export JSON</button>
-  <button class="btn-import" onclick="document.getElementById('importFile').click()">Import JSON</button>
-  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importAnnotations(event)">
 </div>
 
 <div id="historyPanel">
-  <h3>Annotations (<span id="historyCount">0</span>)</h3>
+  <h3>Annotations (<span id="historyCount">0</span>)
+    <button class="btn-clear" onclick="browseAnnotation(-1)" style="padding:4px 10px;font-size:12px;margin-left:8px">&lt; Prev</button>
+    <button class="btn-clear" onclick="browseAnnotation(1)" style="padding:4px 10px;font-size:12px">&gt; Next</button>
+    <button class="btn-export" onclick="exportAnnotations()" style="padding:4px 10px;font-size:12px;margin-left:8px">Export</button>
+    <button class="btn-import" onclick="document.getElementById('importFile').click()" style="padding:4px 10px;font-size:12px">Import</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importAnnotations(event)">
+  </h3>
   <div id="historyList"></div>
 </div>
 
@@ -1023,20 +1025,47 @@ function annotate(verdict){
   runAnalysis(); // refresh display to show the new annotation inline
 }
 
+let browseIndex = -1; // -1 = not browsing
+
 function renderHistory(){
-  const list = document.getElementById('historyList');
   document.getElementById('historyCount').textContent = annotations.length;
-  // Show last 10
-  const recent = annotations.slice(-10).reverse();
-  list.innerHTML = recent.map(a => {
-    const handStr = a.hand.join(', ');
-    const rangeStr = a.safeBid ? ` (${a.safeBid}/${a.normalBid}/${a.riskyBid})` : '';
-    return `<div class="history-item ${a.verdict}">
-      <strong>${a.verdict.toUpperCase()}</strong> — Bid: ${a.aiBid}${rangeStr}, Trump: ${a.aiTrump || '?'}
-      <br><small>${handStr}</small>
-      ${a.note ? '<br><em>' + a.note + '</em>' : ''}
-    </div>`;
-  }).join('');
+  const list = document.getElementById('historyList');
+  if(annotations.length === 0){
+    list.innerHTML = '<div style="color:#64748b;font-size:12px">No annotations yet</div>';
+    return;
+  }
+  // Show current browse position or latest
+  const idx = browseIndex >= 0 ? browseIndex : annotations.length - 1;
+  const a = annotations[idx];
+  const handStr = a.hand.join(', ');
+  const rangeStr = a.safeBid ? ` (${a.safeBid}/${a.normalBid}/${a.riskyBid})` : '';
+  const trumpStr = a.userTrump !== null && a.userTrump !== undefined ? a.userTrump : (a.aiTrump || '?');
+  list.innerHTML = `<div class="history-item ${a.verdict}" style="cursor:pointer" onclick="loadAnnotation(${idx})">
+    <div style="color:#64748b;font-size:11px;margin-bottom:2px">${idx + 1} of ${annotations.length}${a.handNum ? ' — Hand #' + a.handNum.toLocaleString() : ''}</div>
+    <strong>${a.verdict.toUpperCase()}</strong> — Bid: ${a.aiBid}${rangeStr}, Trump: ${trumpStr}
+    <br><small>${handStr}</small>
+    ${a.note ? '<br><em style="color:#cbd5e1">' + a.note + '</em>' : ''}
+    <div style="color:#64748b;font-size:10px;margin-top:4px">Tap to load this hand</div>
+  </div>`;
+}
+
+function browseAnnotation(dir){
+  if(annotations.length === 0) return;
+  if(browseIndex < 0) browseIndex = annotations.length - 1;
+  browseIndex += dir;
+  if(browseIndex < 0) browseIndex = annotations.length - 1;
+  if(browseIndex >= annotations.length) browseIndex = 0;
+  renderHistory();
+}
+
+function loadAnnotation(idx){
+  const a = annotations[idx];
+  if(!a) return;
+  currentHand = a.hand.map(s => { const p = s.split('-'); return [+p[0], +p[1]]; });
+  selectedTrump = a.userTrump;
+  buildPicker();
+  renderHand();
+  runAnalysis();
 }
 
 function exportAnnotations(){

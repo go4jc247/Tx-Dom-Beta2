@@ -398,7 +398,7 @@
 
   function linkify(str) {
     const escaped = escapeHtml(str);
-    return escaped.replace(/(https?:\/\/[^\s&lt;]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#38bdf8;text-decoration:underline">$1</a>');
+    return escaped.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#38bdf8;text-decoration:underline">$1</a>');
   }
 
   // ---- Mini chat mode ----

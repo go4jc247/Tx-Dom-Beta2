@@ -486,7 +486,7 @@ function renderHand(){
 
 function isTrumpTile(tile){
   if(selectedTrump === null) return false;
-  if(selectedTrump === 'NT') return tile[0] === tile[1]; // doubles are trump in NT
+  if(selectedTrump === 'NT' || selectedTrump === 'DOUBLES') return tile[0] === tile[1];
   return tile[0] === selectedTrump || tile[1] === selectedTrump;
 }
 
@@ -508,7 +508,7 @@ function getSortKey(tile, trump){
   const isDouble = tile[0] === tile[1];
   let isTrump = false, isDoubleTrump = false, otherPip = 0;
 
-  if(trump === 'NT'){
+  if(trump === 'NT' || trump === 'DOUBLES'){
     if(isDouble){ isTrump = true; isDoubleTrump = true; }
   } else if(trump !== null && typeof trump === 'number'){
     if(tile[0] === trump || tile[1] === trump){
@@ -528,11 +528,12 @@ function pickTrumpFromTile(tile){
   if(currentHand.length < 7) return;
   // Determine trump suit from clicked tile
   if(tile[0] === tile[1]){
-    // Clicked a double — toggle that suit or NT
-    if(selectedTrump === tile[0]) { selectedTrump = null; }
+    // Clicked a double — cycle: pip suit → NT/DOUBLES → null
+    if(selectedTrump === tile[0]) { selectedTrump = 'DOUBLES'; }
+    else if(selectedTrump === 'DOUBLES') { selectedTrump = null; }
     else { selectedTrump = tile[0]; }
   } else {
-    // Non-double: pick the higher pip as trump (tap again for lower)
+    // Non-double: pick the higher pip as trump (tap again for lower, again for null)
     const high = Math.max(tile[0], tile[1]);
     const low = Math.min(tile[0], tile[1]);
     if(selectedTrump === high) selectedTrump = low;
@@ -552,18 +553,7 @@ function analyzeBidRange(hand, trumpPip){
   const doubles = hand.filter(t => t[0] === t[1]);
   const doublePips = new Set(doubles.map(d => d[0]));
 
-  if(trumpPip === 'NT' || trumpPip === null){
-    // For NT or no trump selected, just return the AI bid as-is
-    return null;
-  }
-
-  const trumpTiles = hand.filter(t => t[0] === trumpPip || t[1] === trumpPip);
-  const trumpCount = trumpTiles.length;
-  const hasDoubleTrump = trumpTiles.some(t => t[0] === trumpPip && t[1] === trumpPip);
-  const nonTrumpDoubles = doubles.filter(d => d[0] !== trumpPip);
-  const offs = hand.filter(t => t[0] !== t[1] && t[0] !== trumpPip && t[1] !== trumpPip);
-
-  // Count tiles reference
+  function tileEq(a,b){ return Math.min(a[0],a[1])===Math.min(b[0],b[1]) && Math.max(a[0],a[1])===Math.max(b[0],b[1]); }
   const COUNT_TILES = [
     { tile: [5,5], pts: 10, suits: [5] },
     { tile: [6,4], pts: 10, suits: [6, 4] },
@@ -571,13 +561,141 @@ function analyzeBidRange(hand, trumpPip){
     { tile: [4,1], pts: 5,  suits: [4, 1] },
     { tile: [3,2], pts: 5,  suits: [3, 2] }
   ];
-  function tileEq(a,b){ return Math.min(a[0],a[1])===Math.min(b[0],b[1]) && Math.max(a[0],a[1])===Math.max(b[0],b[1]); }
 
-  // ── TRUMP RISK (same for all tiers) ──
-  let trumpRisk = 0;
-  if(hasDoubleTrump && trumpCount >= 3) trumpRisk = 1;
-  else if(hasDoubleTrump) trumpRisk = 1;
-  else trumpRisk = 2;
+  // ── NT / DOUBLES analysis ──
+  if(trumpPip === 'NT' || trumpPip === 'DOUBLES'){
+    const offs = hand.filter(t => t[0] !== t[1]);
+    // Each off is a risk — you lose that trick unless partner wins it
+    let totalRisk = 0;
+    let offDetails = [];
+    for(const off of offs){
+      const highPip = Math.max(off[0], off[1]);
+      const hasDoubleAhead = doublePips.has(highPip);
+      const offIsCount = (off[0]+off[1]===5 || off[0]+off[1]===10);
+      let exposure = 0;
+      for(const ct of COUNT_TILES){
+        if(ct.suits.includes(highPip) && !tileEq(ct.tile, off)){
+          if(!hand.some(h => tileEq(h, ct.tile))) exposure += ct.pts;
+        }
+      }
+      const selfCount = offIsCount ? (off[0]+off[1]===10 ? 10 : 5) : 0;
+      offDetails.push({ tile: off, highPip, hasDoubleAhead, exposure, selfCount });
+      totalRisk += 1 + exposure + selfCount;
+    }
+    // All doubles = perfect
+    if(offs.length === 0) return {
+      safeBid: 42, normalBid: 42, riskyBid: 42,
+      trumpCount: doubles.length, hasDoubleTrump: true,
+      nonTrumpDoubles: doubles.length, offs: 0, offBreakdown: ['No offs - perfect!'],
+      isNT: true
+    };
+
+    let safeBid = Math.min(42, 42 - totalRisk);
+    let normalRisk = 0;
+    for(const od of offDetails){
+      let r = 1 + od.selfCount;
+      if(od.hasDoubleAhead) r += Math.ceil(od.exposure * 0.4);
+      else r += od.exposure;
+      normalRisk += r;
+    }
+    if(offs.length >= 2) normalRisk = Math.max(0, normalRisk - 5);
+    let normalBid = Math.min(42, 42 - normalRisk);
+    let riskyRisk = 0;
+    for(const od of offDetails){
+      let r = 1;
+      if(od.hasDoubleAhead) r += Math.ceil(od.exposure * 0.2);
+      else r += Math.ceil(od.exposure * 0.5);
+      riskyRisk += r;
+    }
+    if(offs.length >= 1) riskyRisk = Math.max(0, riskyRisk - 5);
+    let riskyBid = Math.min(42, 42 - riskyRisk);
+
+    // Enforce monotonicity
+    if(normalBid < safeBid) normalBid = safeBid;
+    if(riskyBid < normalBid) riskyBid = normalBid;
+
+    let breakdown = offDetails.map(od => {
+      let s = od.tile[0]+'-'+od.tile[1]+': ';
+      let parts = [];
+      if(od.selfCount > 0) parts.push('is count ('+od.selfCount+'pts)');
+      if(od.exposure > 0) parts.push('exposes '+od.exposure+'pts');
+      if(od.hasDoubleAhead) parts.push('double ahead');
+      return s + (parts.length ? parts.join(', ') : 'low risk');
+    });
+
+    return {
+      safeBid: safeBid < 30 ? 'pass' : safeBid,
+      normalBid: normalBid < 30 ? 'pass' : normalBid,
+      riskyBid: riskyBid < 30 ? 'pass' : riskyBid,
+      trumpCount: doubles.length, hasDoubleTrump: true,
+      nonTrumpDoubles: doubles.length, offs: offs.length,
+      offBreakdown: breakdown, isNT: true
+    };
+  }
+
+  if(trumpPip === null) return null;
+
+  // ── PIP TRUMP analysis ──
+  const trumpTiles = hand.filter(t => t[0] === trumpPip || t[1] === trumpPip);
+  const trumpCount = trumpTiles.length;
+  const hasDoubleTrump = trumpTiles.some(t => t[0] === trumpPip && t[1] === trumpPip);
+  const nonTrumpDoubles = doubles.filter(d => d[0] !== trumpPip);
+  const offs = hand.filter(t => t[0] !== t[1] && t[0] !== trumpPip && t[1] !== trumpPip);
+
+  // Build trump ranking to check top trumps held
+  const allTrumpsRanked = [[trumpPip, trumpPip]];
+  for(let p = maxPip; p >= 0; p--){
+    if(p === trumpPip) continue;
+    allTrumpsRanked.push([Math.min(trumpPip,p), Math.max(trumpPip,p)]);
+  }
+  let topTrumpsHeld = 0;
+  for(const rt of allTrumpsRanked){
+    if(hand.some(h => tileEq(h, rt))) topTrumpsHeld++;
+    else break;
+  }
+
+  // ── TRUMP RISK ──
+  // Check for exposed count in trump suit
+  let trumpCountExposure = 0;
+  for(const ct of COUNT_TILES){
+    const isTrump = ct.tile[0] === trumpPip || ct.tile[1] === trumpPip;
+    if(isTrump && !hand.some(h => tileEq(h, ct.tile))){
+      trumpCountExposure += ct.pts;
+    }
+  }
+
+  let safeTrumpRisk, normalTrumpRisk, riskyTrumpRisk;
+
+  if(topTrumpsHeld >= trumpCount && topTrumpsHeld >= 3){
+    // Have ALL top trumps — unbeatable in trumps
+    safeTrumpRisk = 0; normalTrumpRisk = 0; riskyTrumpRisk = 0;
+  } else if(hasDoubleTrump && topTrumpsHeld >= 2 && trumpCount >= 3){
+    // Double + consecutive top trumps + depth — very safe
+    safeTrumpRisk = 1; normalTrumpRisk = 0; riskyTrumpRisk = 0;
+  } else if(hasDoubleTrump && trumpCount >= 4){
+    // Double + depth — will pull most trumps
+    safeTrumpRisk = 1; normalTrumpRisk = 1; riskyTrumpRisk = 0;
+  } else if(hasDoubleTrump && trumpCount >= 3){
+    // Standard double + 2 more
+    safeTrumpRisk = 2 + Math.ceil(trumpCountExposure * 0.3);
+    normalTrumpRisk = 1;
+    riskyTrumpRisk = 1;
+  } else if(hasDoubleTrump){
+    // Double but only 2 trumps — weak
+    safeTrumpRisk = 3 + trumpCountExposure;
+    normalTrumpRisk = 2 + Math.ceil(trumpCountExposure * 0.5);
+    riskyTrumpRisk = 2;
+  } else if(topTrumpsHeld >= 2 && trumpCount >= 3){
+    // No double but top 2+ and depth
+    safeTrumpRisk = 2 + trumpCountExposure;
+    normalTrumpRisk = 2;
+    riskyTrumpRisk = 1;
+  } else {
+    // No double, not top trumps — significant risk
+    safeTrumpRisk = 4 + trumpCountExposure;
+    normalTrumpRisk = 3 + Math.ceil(trumpCountExposure * 0.5);
+    riskyTrumpRisk = 2;
+  }
 
   // ── OFF RISK per off tile ──
   let offDetails = [];
@@ -587,7 +705,8 @@ function analyzeBidRange(hand, trumpPip){
     const hasDoubleAhead = doublePips.has(highPip);
     const offIsCount = (off[0]+off[1]===5 || off[0]+off[1]===10);
 
-    // Exposed count on high side
+    // Is this a "covered" off? (has double of the high pip, so you lead double first)
+    // Also check if this off is in a suit where you hold the highest remaining tiles
     let highExposure = 0;
     for(const ct of COUNT_TILES){
       if(ct.tile[0]===trumpPip || ct.tile[1]===trumpPip) continue;
@@ -595,7 +714,6 @@ function analyzeBidRange(hand, trumpPip){
         if(!hand.some(h => tileEq(h, ct.tile))) highExposure += ct.pts;
       }
     }
-    // Exposed count on low side
     let lowExposure = 0;
     for(const ct of COUNT_TILES){
       if(ct.tile[0]===trumpPip || ct.tile[1]===trumpPip) continue;
@@ -607,54 +725,81 @@ function analyzeBidRange(hand, trumpPip){
     const worstExposure = Math.max(highExposure, lowExposure);
     const selfCount = offIsCount ? (off[0]+off[1]===10 ? 10 : 5) : 0;
 
+    // Is this off "covered"? (another tile of same high suit in hand gives you 2 plays in that suit)
+    const sameHighSuit = hand.filter(t => !tileEq(t, off) && (t[0]===highPip || t[1]===highPip) && t[0]!==t[1]);
+    const isCovered = hasDoubleAhead || sameHighSuit.length > 0;
+
     offDetails.push({
-      tile: off,
-      highPip, lowPip,
-      hasDoubleAhead,
+      tile: off, highPip, lowPip,
+      hasDoubleAhead, isCovered,
       highExposure, lowExposure,
       worstExposure, selfCount
     });
   }
 
-  // ── SAFE BID: assume worst case for every off ──
+  // ── SAFE BID: worst case for every off ──
   let safeOffRisk = 0;
   for(const od of offDetails){
-    safeOffRisk += 1 + od.worstExposure + od.selfCount; // trick + all exposed count
+    safeOffRisk += 1 + od.worstExposure + od.selfCount;
   }
-  const safeBid = Math.max(28, Math.min(42, 42 - trumpRisk - safeOffRisk));
 
-  // ── NORMAL BID: double-ahead reduces risk, partner helps with 2+ offs ──
+  // ── NORMAL BID: double-ahead mitigates, partner help, covered offs reduce risk ──
   let normalOffRisk = 0;
   for(const od of offDetails){
-    let risk = 1 + od.selfCount;
+    let risk = 1;
     let exposure = od.worstExposure;
     if(od.hasDoubleAhead && exposure > 0) exposure = Math.ceil(exposure * 0.4);
+    else if(od.isCovered && exposure > 0) exposure = Math.ceil(exposure * 0.6);
     risk += exposure;
+    // Self-count: if covered, less likely to lose it
+    if(od.selfCount > 0) risk += od.isCovered ? Math.ceil(od.selfCount * 0.5) : od.selfCount;
     normalOffRisk += risk;
   }
+  // Partner help: expect partner to win ~1 trick with 2+ offs
   if(offs.length >= 2 && nonTrumpDoubles.length >= 1){
-    normalOffRisk = Math.max(0, normalOffRisk - 6); // partner help
+    normalOffRisk = Math.max(0, normalOffRisk - 4);
+  } else if(offs.length >= 1 && nonTrumpDoubles.length >= 2){
+    normalOffRisk = Math.max(0, normalOffRisk - 3);
   }
-  const normalBid = Math.max(28, Math.min(42, 42 - trumpRisk - normalOffRisk));
 
-  // ── RISKY BID: assume partner covers 1 off, doubles protect well ──
+  // ── RISKY BID: partner covers worst off, optimistic on coverage ──
   let riskyOffRisk = 0;
-  // Sort offs by risk descending, assume partner covers the riskiest one
-  const sortedOffs = offDetails.slice().sort((a,b) => (b.worstExposure+b.selfCount) - (a.worstExposure+a.selfCount));
+  const sortedOffs = offDetails.slice().sort((a,b) =>
+    (b.worstExposure+b.selfCount) - (a.worstExposure+a.selfCount));
   for(let i = 0; i < sortedOffs.length; i++){
     const od = sortedOffs[i];
-    if(i === 0 && sortedOffs.length >= 2){
-      // Partner covers worst off — just 1 trick point
+    if(i === 0 && sortedOffs.length >= 1 && nonTrumpDoubles.length >= 1){
+      // Partner likely covers worst off — just 1 trick point
       riskyOffRisk += 1;
       continue;
     }
     let risk = 1;
     let exposure = od.worstExposure;
-    if(od.hasDoubleAhead) exposure = Math.ceil(exposure * 0.3);
-    risk += Math.ceil(exposure * 0.5) + Math.ceil(od.selfCount * 0.5); // optimistic
+    if(od.hasDoubleAhead || od.isCovered) exposure = Math.ceil(exposure * 0.2);
+    else exposure = Math.ceil(exposure * 0.4);
+    risk += exposure;
+    if(od.selfCount > 0) risk += Math.ceil(od.selfCount * 0.3);
     riskyOffRisk += risk;
   }
-  const riskyBid = Math.max(28, Math.min(42, 42 - trumpRisk - riskyOffRisk));
+
+  let safeBid = Math.min(42, 42 - safeTrumpRisk - safeOffRisk);
+  let normalBid = Math.min(42, 42 - normalTrumpRisk - normalOffRisk);
+  let riskyBid = Math.min(42, 42 - riskyTrumpRisk - riskyOffRisk);
+
+  // Enforce monotonicity: risky >= normal >= safe
+  if(normalBid < safeBid) normalBid = safeBid;
+  if(riskyBid < normalBid) riskyBid = normalBid;
+
+  // Strong hand bonus: 4+ trumps with all top + doubles = push bids up
+  if(topTrumpsHeld >= 3 && trumpCount >= 4 && nonTrumpDoubles.length >= 1){
+    // Nearly unbeatable — offs are the only risk
+    if(offs.length === 0){ safeBid = 42; normalBid = 42; riskyBid = 42; }
+    else if(offs.length === 1 && offDetails[0].isCovered){
+      safeBid = Math.max(safeBid, 36);
+      normalBid = Math.max(normalBid, 38);
+      riskyBid = Math.max(riskyBid, 42);
+    }
+  }
 
   // Build risk breakdown strings
   let breakdown = [];
@@ -664,15 +809,22 @@ function analyzeBidRange(hand, trumpPip){
     if(od.selfCount > 0) risks.push('is count ('+od.selfCount+'pts)');
     if(od.worstExposure > 0) risks.push('exposes '+od.worstExposure+'pts');
     if(od.hasDoubleAhead) risks.push('double ahead');
+    else if(od.isCovered) risks.push('covered');
     s += risks.length ? risks.join(', ') : 'low risk';
     breakdown.push(s);
+  }
+  // Add trump info to breakdown
+  if(topTrumpsHeld > 0){
+    breakdown.unshift('Top ' + topTrumpsHeld + ' of ' + trumpCount + ' trumps held' +
+      (trumpCountExposure > 0 ? ' (' + trumpCountExposure + 'pts trump count exposed)' : ''));
   }
 
   return {
     safeBid: safeBid < 30 ? 'pass' : safeBid,
     normalBid: normalBid < 30 ? 'pass' : normalBid,
     riskyBid: riskyBid < 30 ? 'pass' : riskyBid,
-    trumpCount, hasDoubleTrump, nonTrumpDoubles: nonTrumpDoubles.length,
+    trumpCount, hasDoubleTrump, topTrumpsHeld,
+    nonTrumpDoubles: nonTrumpDoubles.length,
     offs: offs.length, offBreakdown: breakdown
   };
 }
@@ -715,16 +867,18 @@ function runAnalysis(){
   const trumpForRange = selectedTrump !== null ? selectedTrump : aiTrump;
   const range = analyzeBidRange(currentHand, trumpForRange);
 
+  // Show AI recommendation
+  const aiTrumpStr = aiTrump === 'NT' ? 'No Trump (Doubles)' : (aiTrump !== null ? aiTrump + 's' : '—');
   if(result.action === 'bid'){
-    const trumpStr = aiTrump === 'NT' ? 'No Trump (Doubles)' : (aiTrump !== null ? aiTrump + 's' : '?');
-    html += '<div class="result-row"><span class="label">Best Trump: </span><span class="value">' + trumpStr + '</span></div>';
-
-    if(selectedTrump !== null && selectedTrump !== aiTrump){
-      html += '<div class="result-row" style="color:#f59e0b"><span class="label">Your Trump: </span><span class="value">' + (selectedTrump === 'NT' ? 'NT' : selectedTrump + 's') + ' (AI disagrees)</span></div>';
-    }
+    html += '<div class="result-row"><span class="label">AI Bid: </span><span class="bid-value">' + result.bid + '</span><span class="label"> on </span><span class="value">' + aiTrumpStr + '</span></div>';
     if(result.marks > 1) html += '<div class="result-row"><span class="label">Marks: </span><span class="value">' + result.marks + 'x</span></div>';
   } else {
     html += '<div class="result-row"><span class="label">AI says: </span><span class="pass-value">Pass</span></div>';
+  }
+  // Show what trump the range analysis is using
+  if(selectedTrump !== null){
+    const selStr = selectedTrump === 'DOUBLES' ? 'Doubles' : (selectedTrump === 'NT' ? 'NT' : selectedTrump + 's');
+    html += '<div class="result-row"><span class="label">Analyzing: </span><span class="value" style="color:#eab308">' + selStr + ' as trump</span></div>';
   }
 
   // Show bid range if available

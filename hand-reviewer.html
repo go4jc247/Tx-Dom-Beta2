@@ -895,10 +895,33 @@ function runAnalysis(){
 
   let html = '';
 
-  // Hand number
+  // Hand number + prior annotations check
   const hNum = handNumber(currentHand);
   if(hNum !== null){
-    html += '<div class="result-row"><span class="label">Hand #</span><span class="value">' + hNum.toLocaleString() + '</span><span class="label"> of 1,184,040</span></div>';
+    const handKey = currentHand.map(t => Math.min(t[0],t[1])+'-'+Math.max(t[0],t[1])).sort().join(',');
+    const priorNotes = annotations.filter(a => {
+      const aKey = a.hand.slice().sort().join(',');
+      return aKey === handKey;
+    });
+    html += '<div class="result-row"><span class="label">Hand #</span><span class="value">' + hNum.toLocaleString() + '</span><span class="label"> of 1,184,040</span>';
+    if(priorNotes.length > 0){
+      const lastVerdict = priorNotes[priorNotes.length - 1].verdict;
+      const vColor = lastVerdict === 'correct' ? '#22c55e' : lastVerdict === 'wrong' ? '#ef4444' : '#94a3b8';
+      html += ' <span style="color:' + vColor + ';font-weight:700;margin-left:8px">(' + priorNotes.length + ' prior note' + (priorNotes.length > 1 ? 's' : '') + ')</span>';
+    }
+    html += '</div>';
+    // Show prior notes if any
+    if(priorNotes.length > 0){
+      html += '<div style="margin:4px 0 8px;padding:6px 8px;background:#1a2332;border-radius:6px;border-left:3px solid ' + (priorNotes[priorNotes.length-1].verdict==='correct'?'#22c55e':'#ef4444') + ';font-size:12px;color:#94a3b8">';
+      for(const pn of priorNotes){
+        const vLabel = pn.verdict === 'correct' ? '<span style="color:#22c55e">CORRECT</span>' : '<span style="color:#ef4444">WRONG</span>';
+        html += '<div style="margin-bottom:4px">' + vLabel;
+        if(pn.userTrump !== null && pn.userTrump !== undefined) html += ' (trump: ' + pn.userTrump + ')';
+        if(pn.note) html += ' — <em>' + pn.note + '</em>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
   }
 
   // Auto-set trump to AI recommendation if user hasn't picked

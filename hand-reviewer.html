@@ -737,67 +737,67 @@ function analyzeBidRange(hand, trumpPip){
     });
   }
 
-  // ── SAFE BID: worst case for every off ──
-  let safeOffRisk = 0;
+  // ──────────────────────────────────────────
+  // SAFE BID CALCULATION
+  // Each off costs ~3-7 pts (trick + opponent dumps count)
+  // Per-off cost diminishes with more offs (count is finite)
+  // Normal = safe + 1-2, Risky = safe + 2-6
+  // ──────────────────────────────────────────
+  const offCountFactor = 1 / (1 + offs.length * 0.12);
+  let totalOffCost = 0;
   for(const od of offDetails){
-    safeOffRisk += 1 + od.worstExposure + od.selfCount;
+    const exposure = od.worstExposure + od.selfCount;
+    let cost = 3 + Math.round(exposure * 0.45 * offCountFactor);
+    if(od.hasDoubleAhead) cost = Math.max(3, cost - 1);
+    totalOffCost += cost;
   }
 
-  // ── NORMAL BID: double-ahead mitigates, partner help, covered offs reduce risk ──
-  let normalOffRisk = 0;
-  for(const od of offDetails){
-    let risk = 1;
-    let exposure = od.worstExposure;
-    if(od.hasDoubleAhead && exposure > 0) exposure = Math.ceil(exposure * 0.4);
-    else if(od.isCovered && exposure > 0) exposure = Math.ceil(exposure * 0.6);
-    risk += exposure;
-    // Self-count: if covered, less likely to lose it
-    if(od.selfCount > 0) risk += od.isCovered ? Math.ceil(od.selfCount * 0.5) : od.selfCount;
-    normalOffRisk += risk;
-  }
-  // Partner help: expect partner to win ~1 trick with 2+ offs
-  if(offs.length >= 2 && nonTrumpDoubles.length >= 1){
-    normalOffRisk = Math.max(0, normalOffRisk - 4);
-  } else if(offs.length >= 1 && nonTrumpDoubles.length >= 2){
-    normalOffRisk = Math.max(0, normalOffRisk - 3);
-  }
+  let safeBid = Math.min(42, 42 - safeTrumpRisk - totalOffCost);
 
-  // ── RISKY BID: partner covers worst off, optimistic on coverage ──
-  let riskyOffRisk = 0;
-  const sortedOffs = offDetails.slice().sort((a,b) =>
-    (b.worstExposure+b.selfCount) - (a.worstExposure+a.selfCount));
-  for(let i = 0; i < sortedOffs.length; i++){
-    const od = sortedOffs[i];
-    if(i === 0 && sortedOffs.length >= 1 && nonTrumpDoubles.length >= 1){
-      // Partner likely covers worst off — just 1 trick point
-      riskyOffRisk += 1;
-      continue;
-    }
-    let risk = 1;
-    let exposure = od.worstExposure;
-    if(od.hasDoubleAhead || od.isCovered) exposure = Math.ceil(exposure * 0.2);
-    else exposure = Math.ceil(exposure * 0.4);
-    risk += exposure;
-    if(od.selfCount > 0) risk += Math.ceil(od.selfCount * 0.3);
-    riskyOffRisk += risk;
-  }
+  // ── NORMAL BID: safe + 1-2 ──
+  let normalBump = 0;
+  if(topTrumpsHeld >= 3 || (hasDoubleTrump && topTrumpsHeld >= 2)) normalBump = 2;
+  else if(hasDoubleTrump || topTrumpsHeld >= 2) normalBump = 1;
+  const coveredCount = offDetails.filter(od => od.isCovered).length;
+  if(coveredCount >= offs.length && offs.length > 0) normalBump += 1;
+  let normalBid = safeBid + normalBump;
 
-  let safeBid = Math.min(42, 42 - safeTrumpRisk - safeOffRisk);
-  let normalBid = Math.min(42, 42 - normalTrumpRisk - normalOffRisk);
-  let riskyBid = Math.min(42, 42 - riskyTrumpRisk - riskyOffRisk);
+  // ── RISKY BID: safe + 2-6 ──
+  let riskyBump = 2;
+  if(topTrumpsHeld >= 3) riskyBump += 3;
+  else if(topTrumpsHeld >= 2 && hasDoubleTrump) riskyBump += 2;
+  else if(hasDoubleTrump && trumpCount >= 4) riskyBump += 2;
+  else if(hasDoubleTrump || topTrumpsHeld >= 2) riskyBump += 1;
+  if(coveredCount > 0) riskyBump += 1;
+  if(nonTrumpDoubles.length >= 2) riskyBump += 1;
+  riskyBump = Math.min(riskyBump, 10);
+  let riskyBid = safeBid + riskyBump;
 
-  // Enforce monotonicity: risky >= normal >= safe
+  // Cap and enforce monotonicity
+  safeBid = Math.min(42, safeBid);
+  normalBid = Math.min(42, normalBid);
+  riskyBid = Math.min(42, riskyBid);
   if(normalBid < safeBid) normalBid = safeBid;
   if(riskyBid < normalBid) riskyBid = normalBid;
 
-  // Strong hand bonus: 4+ trumps with all top + doubles = push bids up
+  // ── DOMINANT HAND DETECTION ──
+  if(topTrumpsHeld >= trumpCount && trumpCount >= 3 && offs.length === 0){
+    safeBid = 42; normalBid = 42; riskyBid = 42;
+  }
   if(topTrumpsHeld >= 3 && trumpCount >= 4 && nonTrumpDoubles.length >= 1){
-    // Nearly unbeatable — offs are the only risk
     if(offs.length === 0){ safeBid = 42; normalBid = 42; riskyBid = 42; }
     else if(offs.length === 1 && offDetails[0].isCovered){
       safeBid = Math.max(safeBid, 36);
-      normalBid = Math.max(normalBid, 38);
+      normalBid = Math.max(normalBid, 40);
       riskyBid = Math.max(riskyBid, 42);
+    }
+  }
+  if(topTrumpsHeld >= 4 && hasDoubleTrump){
+    if(offs.length === 0){ safeBid = 42; normalBid = 42; riskyBid = 42; }
+    else if(offs.length <= 1){
+      safeBid = Math.max(safeBid, 38);
+      normalBid = Math.max(normalBid, 42);
+      riskyBid = 42;
     }
   }
 

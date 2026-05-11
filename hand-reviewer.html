@@ -154,20 +154,21 @@ h1 { font-size: 18px; text-align: center; margin-bottom: 8px; color: #eab308; }
 </div>
 
 <div id="annotationArea" style="display:none">
-  <div id="starRating" style="text-align:center;margin:6px 0">
-    <div style="font-size:11px;color:#64748b;margin-bottom:2px">
-      <span style="color:#ef4444">1=Wrong</span>
-      <span style="margin:0 6px">2</span>
-      <span>3</span>
-      <span style="margin:0 6px">4</span>
-      <span style="color:#22c55e">5=Correct</span>
+  <div id="starRating" style="display:flex;justify-content:center;gap:8px;margin:8px 0;flex-wrap:wrap">
+    <div style="background:#ef4444;border-radius:8px;padding:6px 10px;cursor:pointer;text-align:center;min-width:90px" onmouseenter="previewStars(1)" onmouseleave="previewStars(0)" ontouchstart="previewStars(1)">
+      <div style="font-size:11px;font-weight:700;color:#fff;margin-bottom:2px">WRONG</div>
+      <span class="star" onclick="submitRating(1)" style="cursor:pointer;font-size:24px;color:rgba(255,255,255,0.4)">&#9733;</span>
+      <span class="star" onclick="submitRating(2)" style="cursor:pointer;font-size:24px;color:rgba(255,255,255,0.4)">&#9733;</span>
     </div>
-    <span class="star" onclick="submitRating(1)" style="cursor:pointer;font-size:28px;color:#475569">&#9733;</span>
-    <span class="star" onclick="submitRating(2)" style="cursor:pointer;font-size:28px;color:#475569">&#9733;</span>
-    <span class="star" onclick="submitRating(3)" style="cursor:pointer;font-size:28px;color:#475569">&#9733;</span>
-    <span class="star" onclick="submitRating(4)" style="cursor:pointer;font-size:28px;color:#475569">&#9733;</span>
-    <span class="star" onclick="submitRating(5)" style="cursor:pointer;font-size:28px;color:#475569">&#9733;</span>
-    <span id="ratingLabel" style="font-size:12px;color:#94a3b8;margin-left:4px"></span>
+    <div style="background:#eab308;border-radius:8px;padding:6px 10px;cursor:pointer;text-align:center" onmouseenter="previewStars(3)" onmouseleave="previewStars(0)" ontouchstart="previewStars(3)">
+      <div style="font-size:11px;font-weight:700;color:#fff;margin-bottom:2px">OK</div>
+      <span class="star" onclick="submitRating(3)" style="cursor:pointer;font-size:24px;color:rgba(255,255,255,0.4)">&#9733;</span>
+    </div>
+    <div style="background:#22c55e;border-radius:8px;padding:6px 10px;cursor:pointer;text-align:center;min-width:90px" onmouseenter="previewStars(5)" onmouseleave="previewStars(0)" ontouchstart="previewStars(5)">
+      <div style="font-size:11px;font-weight:700;color:#fff;margin-bottom:2px">CORRECT</div>
+      <span class="star" onclick="submitRating(4)" style="cursor:pointer;font-size:24px;color:rgba(255,255,255,0.4)">&#9733;</span>
+      <span class="star" onclick="submitRating(5)" style="cursor:pointer;font-size:24px;color:rgba(255,255,255,0.4)">&#9733;</span>
+    </div>
   </div>
   <div style="text-align:center;margin:6px 0">
     <button class="btn-random" onclick="randomHand()">Next Random</button>
@@ -1034,7 +1035,8 @@ function annotate(verdict){
   annotations.push(entry);
   localStorage.setItem('hr_annotations', JSON.stringify(annotations));
   document.getElementById('noteInput').value = '';
-  setRating(0); // reset stars
+  currentRating = 0;
+  previewStars(0); // reset stars
   renderHistory();
   runAnalysis(); // refresh display to show the new annotation inline
 }
@@ -1042,24 +1044,16 @@ function annotate(verdict){
 let browseIndex = -1; // -1 = not browsing
 let currentRating = 0;
 
-function highlightStars(n){
+function previewStars(n){
+  // Light up stars up to n on hover/touch
   const stars = document.querySelectorAll('#starRating .star');
-  const colors = ['#475569','#ef4444','#f97316','#eab308','#84cc16','#22c55e'];
   for(let i = 0; i < stars.length; i++){
-    stars[i].style.color = i < n ? colors[n] : '#475569';
+    stars[i].style.color = i < n ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.4)';
   }
-  const labels = ['','Wrong','Poor','OK','Good','Correct'];
-  document.getElementById('ratingLabel').textContent = labels[n] || '';
-}
-
-function setRating(n){
-  currentRating = (currentRating === n) ? 0 : n;
-  highlightStars(currentRating);
 }
 
 function submitRating(n){
   currentRating = n;
-  highlightStars(n);
   const verdict = n >= 4 ? 'correct' : n <= 2 ? 'wrong' : 'ok';
   annotate(verdict);
 }

@@ -42,7 +42,7 @@
         '<div class="claude-chat-msg-header">' +
           '<span class="claude-chat-msg-name">' + escapeHtml(msg.name) + '</span>' +
         '</div>' +
-        '<div class="claude-chat-msg-text">' + escapeHtml(msg.text) + '</div>';
+        '<div class="claude-chat-msg-text">' + linkify(msg.text) + '</div>';
       container.appendChild(div);
     }
     container.scrollTop = container.scrollHeight;

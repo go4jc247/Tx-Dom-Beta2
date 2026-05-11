@@ -338,7 +338,7 @@
     div._statusEl = null;
 
     if (isSystem) {
-      div.innerHTML = '<span class="claude-chat-msg-text-system">' + escapeHtml(text) + '</span>';
+      div.innerHTML = '<span class="claude-chat-msg-text-system">' + linkify(text) + '</span>';
     } else {
       const statusText = isSelf ? '<span class="claude-chat-msg-status" style="color:rgba(255,200,100,0.6);font-size:9px;">sending...</span>' : '';
       div.innerHTML =
@@ -346,7 +346,7 @@
           '<span class="claude-chat-msg-name">' + escapeHtml(name) + '</span>' +
           statusText +
         '</div>' +
-        '<div class="claude-chat-msg-text">' + escapeHtml(text) + '</div>';
+        '<div class="claude-chat-msg-text">' + linkify(text) + '</div>';
     }
 
     container.appendChild(div);
@@ -394,6 +394,11 @@
     const d = document.createElement('div');
     d.textContent = str;
     return d.innerHTML;
+  }
+
+  function linkify(str) {
+    const escaped = escapeHtml(str);
+    return escaped.replace(/(https?:\/\/[^\s&lt;]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#38bdf8;text-decoration:underline">$1</a>');
   }
 
   // ---- Mini chat mode ----
@@ -461,7 +466,7 @@
     if (!container) return;
     const div = document.createElement('div');
     div.style.cssText = 'margin-bottom:4px;' + (isSelf ? 'text-align:right;' : '');
-    div.innerHTML = '<span style="color:' + (isSelf ? 'rgba(167,139,250,0.8)' : 'rgba(34,197,94,0.8)') + ';font-weight:600;font-size:10px;">' + name + '</span> <span style="color:rgba(255,255,255,0.8);">' + text.replace(/</g,'&lt;') + '</span>';
+    div.innerHTML = '<span style="color:' + (isSelf ? 'rgba(167,139,250,0.8)' : 'rgba(34,197,94,0.8)') + ';font-weight:600;font-size:10px;">' + name + '</span> <span style="color:rgba(255,255,255,0.8);">' + linkify(text) + '</span>';
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
   }

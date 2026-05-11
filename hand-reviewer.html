@@ -1064,6 +1064,29 @@ function importAnnotations(event){
 // RANDOM HAND
 // ============================================================
 function randomHand(){
+  // Build set of already-evaluated hand keys
+  const evaluatedKeys = new Set();
+  for(const a of annotations){
+    evaluatedKeys.add(a.hand.slice().sort().join(','));
+  }
+
+  // Try up to 100 times to find an unevaluated hand
+  let attempts = 0;
+  while(attempts < 100){
+    const shuffled = ALL_TILES.slice().sort(() => Math.random() - 0.5);
+    const candidate = shuffled.slice(0, 7);
+    const key = candidate.map(t => Math.min(t[0],t[1])+'-'+Math.max(t[0],t[1])).sort().join(',');
+    if(!evaluatedKeys.has(key)){
+      currentHand = candidate;
+      selectedTrump = null;
+      buildPicker();
+      renderHand();
+      runAnalysis();
+      return;
+    }
+    attempts++;
+  }
+  // Fallback if somehow all attempts hit evaluated hands (unlikely with 1.18M)
   const shuffled = ALL_TILES.slice().sort(() => Math.random() - 0.5);
   currentHand = shuffled.slice(0, 7);
   selectedTrump = null;

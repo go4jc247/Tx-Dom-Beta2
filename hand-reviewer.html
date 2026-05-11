@@ -1017,6 +1017,7 @@ function annotate(verdict){
   localStorage.setItem('hr_annotations', JSON.stringify(annotations));
   document.getElementById('noteInput').value = '';
   renderHistory();
+  runAnalysis(); // refresh display to show the new annotation inline
 }
 
 function renderHistory(){

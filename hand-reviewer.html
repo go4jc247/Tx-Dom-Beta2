@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Pure 42 Hand Reviewer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 12px;
+  min-height: 100vh;
+  -webkit-user-select: none; user-select: none;
+}
+h1 { font-size: 18px; text-align: center; margin-bottom: 8px; color: #eab308; }
+
+/* Hand input */
+#inputArea { text-align: center; margin-bottom: 12px; }
+#inputArea label { font-size: 13px; color: #94a3b8; }
+
+/* Tile picker grid */
+#tilePicker {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  max-width: 360px;
+  margin: 8px auto;
+}
+.pickTile {
+  width: 100%; aspect-ratio: 1/2;
+  border: 2px solid #334155;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.pickTile.selected { border-color: #eab308; box-shadow: 0 0 6px #eab308; }
+.pickTile.disabled { opacity: 0.25; pointer-events: none; }
+.pickTile canvas { width: 100%; height: 100%; display: block; }
+
+/* Hand display */
+#handArea {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 12px auto;
+  min-height: 90px;
+}
+.handTile {
+  width: 52px; height: 104px;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.handTile.trump { box-shadow: 0 0 10px 2px rgba(234,179,8,0.7); transform: translateY(-4px); }
+.handTile canvas { width: 100%; height: 100%; display: block; border-radius: 8px; }
+
+/* Results panel */
+#resultsPanel {
+  background: #1e293b;
+  border-radius: 10px;
+  padding: 12px 16px;
+  max-width: 400px;
+  margin: 12px auto;
+  border: 1px solid #334155;
+}
+#resultsPanel h2 { font-size: 15px; color: #38bdf8; margin-bottom: 6px; }
+.result-row { font-size: 13px; margin: 4px 0; line-height: 1.5; }
+.result-row .label { color: #94a3b8; }
+.result-row .value { color: #f1f5f9; font-weight: 600; }
+.bid-value { color: #22c55e; font-size: 18px; font-weight: 700; }
+.pass-value { color: #ef4444; font-size: 18px; font-weight: 700; }
+
+/* Annotation */
+#annotationArea {
+  max-width: 400px;
+  margin: 12px auto;
+  text-align: center;
+}
+#annotationArea button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 4px;
+}
+.btn-correct { background: #22c55e; color: #fff; }
+.btn-wrong { background: #ef4444; color: #fff; }
+.btn-export { background: #3b82f6; color: #fff; }
+.btn-import { background: #6366f1; color: #fff; }
+.btn-clear { background: #64748b; color: #fff; }
+.btn-random { background: #8b5cf6; color: #fff; }
+#noteInput {
+  width: 100%;
+  max-width: 360px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* History */
+#historyPanel {
+  max-width: 400px;
+  margin: 16px auto;
+  font-size: 12px;
+}
+#historyPanel h3 { color: #94a3b8; margin-bottom: 6px; font-size: 13px; }
+.history-item {
+  background: #1e293b;
+  border-radius: 6px;
+  padding: 8px;
+  margin: 4px 0;
+  border-left: 3px solid #475569;
+}
+.history-item.correct { border-left-color: #22c55e; }
+.history-item.wrong { border-left-color: #ef4444; }
+
+/* Instructions */
+#instructions {
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+  margin: 8px 0;
+}
+</style>
+</head>
+<body>
+
+<h1>Pure 42 Hand Reviewer</h1>
+<div id="instructions">Tap 7 tiles to build a hand. Tap a hand tile to set trump suit.</div>
+
+<div id="inputArea">
+  <div id="tilePicker"></div>
+  <button class="btn-random" onclick="randomHand()">Random Hand</button>
+  <button class="btn-clear" onclick="clearHand()">Clear</button>
+</div>
+
+<div id="handArea"></div>
+<div id="resultsPanel" style="display:none">
+  <h2>AI Analysis</h2>
+  <div id="resultsContent"></div>
+</div>
+
+<div id="annotationArea" style="display:none">
+  <button class="btn-correct" onclick="annotate('correct')">Correct</button>
+  <button class="btn-wrong" onclick="annotate('wrong')">Wrong</button>
+  <br>
+  <input type="text" id="noteInput" placeholder="Notes (optional)...">
+  <br><br>
+  <button class="btn-export" onclick="exportAnnotations()">Export JSON</button>
+  <button class="btn-import" onclick="document.getElementById('importFile').click()">Import JSON</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importAnnotations(event)">
+</div>
+
+<div id="historyPanel">
+  <h3>Annotations (<span id="historyCount">0</span>)</h3>
+  <div id="historyList"></div>
+</div>
+
+<script>
+// ============================================================
+// DOMINO RENDERING (extracted from game.js)
+// ============================================================
+const DOMINO_STYLE = {
+  PIP_SCALE: 2.05,
+  DISPLAY_PIP_SCALE: 1.5,
+  FACE: {
+    HIGHLIGHTED: "rgba(255,255,255,1.0)",
+    NORMAL: "rgba(245,236,221,0.96)",
+  },
+  BACK: {
+    NORMAL: "rgba(232,222,205,0.92)",
+    HIGHLIGHTED: "rgba(245,240,230,0.95)",
+  },
+  EDGE: { NORMAL: "#d7d7d7", HIGHLIGHTED: "#e8e8e8" },
+  EDGE_THICKNESS: 20,
+  INVALID_OPACITY: 0.35,
+  PIP_COLORS: {
+    0: "rgba(20,20,22,0.95)",
+    1: "rgba(54,178,88,0.98)",
+    2: "rgba(240,199,61,0.98)",
+    3: "rgba(231,76,60,0.98)",
+    4: "rgba(0,178,255,0.98)",
+    5: "rgba(155,89,182,0.98)",
+    6: "rgba(167,110,52,0.98)",
+    7: "rgba(59,130,246,0.98)",
+  },
+  BORDER_COLOR: "rgba(0,0,0,0.22)",
+  BORDER_WIDTH: 1.4,
+  CENTER_LINE_WIDTH: 2,
+  CENTER_LINE_COLOR: "rgba(0,0,0,0.22)",
+  BEVEL_OPACITY: 0.40,
+  BEVEL_COLOR: "rgba(255,255,255,0.75)",
+  BEVEL_WIDTH: 2,
+  PIPFX_ENABLED: true,
+  PIPFX_RING_WIDTH_RATIO: 0.34,
+  PIPFX_RING_OPACITY: 0.06,
+  PIPFX_HI1_OPACITY: 0.33,
+  PIPFX_HI2_OPACITY: 0.22,
+  PIPFX_HI1_SIZE: 0.85,
+  PIPFX_HI2_SIZE: 0.24,
+  PIPFX_HI1_DX: -0.60,
+  PIPFX_HI1_DY: -0.46,
+  PIPFX_HI2_DX: -0.12,
+  PIPFX_HI2_DY: -0.10,
+  PIPFX_HI_LOCK_SCREEN: true,
+  PIPFX_GRADIENT: true,
+  FANCY_LINE_ENABLED: true,
+  FANCY_LINE_COLOR: "rgba(0,0,0,0.90)",
+  CENTER_LINE_HI_COLOR: "rgba(255,255,255,1)",
+  CENTER_LINE_HI_OPACITY: 0.45,
+  CENTER_LINE_HI_WIDTH_RATIO: 0.40,
+  CENTER_LINE_HI_Y_OFFSET_PX: -1.6,
+  CENTER_LINE_SH_COLOR: "rgba(0,0,0,1)",
+  CENTER_LINE_SH_OPACITY: 0.30,
+  CENTER_LINE_SH_WIDTH_RATIO: 0.32,
+  CENTER_LINE_SH_Y_OFFSET_PX: 1.6,
+};
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+function parseRGBA(str){
+  let m=str.match(/^#([0-9a-f]{6})$/i);
+  if(m){ const h=m[1]; return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16),a:1}; }
+  m=str.match(/^rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)$/i);
+  if(m){ return {r:parseInt(m[1]),g:parseInt(m[2]),b:parseInt(m[3]),a:m[4]?parseFloat(m[4]):1}; }
+  return {r:255,g:255,b:255,a:1};
+}
+function rgbaToStr(c){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${c.a})`; }
+function lerpRGB(c1,c2,t){ return {r:lerp(c1.r,c2.r,t),g:lerp(c1.g,c2.g,t),b:lerp(c1.b,c2.b,t),a:1}; }
+function roundRectPath(ctx,x,y,w,h,r){
+  r=Math.max(0,Math.min(r,Math.min(w,h)/2));
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+}
+function pipColorForValue(v){ return DOMINO_STYLE.PIP_COLORS[Number(v)] || DOMINO_STYLE.PIP_COLORS[0]; }
+
+function drawFace(ctx, tile, w, h, highlighted, valid){
+  highlighted = highlighted || false;
+  valid = (valid !== undefined) ? valid : true;
+  const lw = Math.max(2, Math.floor(w * 0.02)), rCss = 12;
+  ctx.clearRect(0, 0, w, h);
+
+  const faceColor = highlighted ? DOMINO_STYLE.FACE.HIGHLIGHTED : DOMINO_STYLE.FACE.NORMAL;
+  const topColor = lerpRGB(parseRGBA(faceColor), {r:255,g:255,b:255,a:1}, 0.02);
+  const botColor = lerpRGB(parseRGBA(faceColor), {r:0,g:0,b:0,a:1}, 0.02);
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, rgbaToStr(topColor));
+  g.addColorStop(1, rgbaToStr(botColor));
+  ctx.fillStyle = g;
+  roundRectPath(ctx, 0, 0, w, h, rCss);
+  ctx.fill();
+
+  // Bevel
+  ctx.save();
+  ctx.globalAlpha = DOMINO_STYLE.BEVEL_OPACITY;
+  ctx.strokeStyle = DOMINO_STYLE.BEVEL_COLOR;
+  ctx.lineWidth = DOMINO_STYLE.BEVEL_WIDTH;
+  roundRectPath(ctx, 1, 1, w-2, h-2, rCss);
+  ctx.stroke();
+  ctx.restore();
+
+  // Border
+  const edgeColor = highlighted ? DOMINO_STYLE.EDGE.HIGHLIGHTED : DOMINO_STYLE.EDGE.NORMAL;
+  ctx.lineWidth = DOMINO_STYLE.BORDER_WIDTH;
+  ctx.strokeStyle = edgeColor;
+  roundRectPath(ctx, 0, 0, w, h, rCss);
+  ctx.stroke();
+
+  // Pip patterns
+  const spots = {
+    0: [], 1: [[0,0]], 2: [[-1,-1],[1,1]], 3: [[-1,-1],[0,0],[1,1]],
+    4: [[-1,-1],[1,-1],[-1,1],[1,1]], 5: [[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],
+    6: [[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]],
+    7: [[-1,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[1,1]]
+  };
+
+  const hh = h / 2;
+  const sx = w * 0.27;
+  const sy = hh * 0.27;
+  const pr = Math.max(1.2, Math.min(w, hh) * 0.062 * DOMINO_STYLE.PIP_SCALE);
+
+  // Center line
+  const lineOpacity = valid ? 1.0 : DOMINO_STYLE.INVALID_OPACITY;
+  ctx.save();
+  ctx.globalAlpha = lineOpacity;
+  if (DOMINO_STYLE.FANCY_LINE_ENABLED) {
+    const cxGrid = w / 2;
+    const minX = cxGrid - sx - pr;
+    const maxX = cxGrid + sx + pr;
+    const baseW = Math.max(DOMINO_STYLE.CENTER_LINE_WIDTH, pr * 0.60);
+    ctx.beginPath(); ctx.moveTo(minX, h/2); ctx.lineTo(maxX, h/2);
+    ctx.lineWidth = baseW; ctx.strokeStyle = DOMINO_STYLE.FANCY_LINE_COLOR;
+    ctx.lineCap = "round"; ctx.stroke();
+    // Highlight
+    const hiA = DOMINO_STYLE.CENTER_LINE_HI_OPACITY;
+    if (hiA > 0) {
+      const hiW = Math.max(1, baseW * DOMINO_STYLE.CENTER_LINE_HI_WIDTH_RATIO);
+      ctx.save(); ctx.globalAlpha = lineOpacity * hiA;
+      ctx.strokeStyle = DOMINO_STYLE.CENTER_LINE_HI_COLOR; ctx.lineWidth = hiW;
+      ctx.beginPath(); ctx.moveTo(minX, h/2 + DOMINO_STYLE.CENTER_LINE_HI_Y_OFFSET_PX);
+      ctx.lineTo(maxX, h/2 + DOMINO_STYLE.CENTER_LINE_HI_Y_OFFSET_PX);
+      ctx.lineCap = "round"; ctx.stroke(); ctx.restore();
+    }
+    // Shadow
+    const shA = DOMINO_STYLE.CENTER_LINE_SH_OPACITY;
+    if (shA > 0) {
+      const shW = Math.max(1, baseW * DOMINO_STYLE.CENTER_LINE_SH_WIDTH_RATIO);
+      ctx.save(); ctx.globalAlpha = lineOpacity * shA;
+      ctx.strokeStyle = DOMINO_STYLE.CENTER_LINE_SH_COLOR; ctx.lineWidth = shW;
+      ctx.beginPath(); ctx.moveTo(minX, h/2 + DOMINO_STYLE.CENTER_LINE_SH_Y_OFFSET_PX);
+      ctx.lineTo(maxX, h/2 + DOMINO_STYLE.CENTER_LINE_SH_Y_OFFSET_PX);
+      ctx.lineCap = "round"; ctx.stroke(); ctx.restore();
+    }
+  } else {
+    ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2);
+    ctx.lineWidth = DOMINO_STYLE.CENTER_LINE_WIDTH;
+    ctx.strokeStyle = DOMINO_STYLE.CENTER_LINE_COLOR; ctx.stroke();
+  }
+  ctx.restore();
+
+  // Fancy pip
+  function pipFancy(x, y, pr, col){
+    if (DOMINO_STYLE.PIPFX_GRADIENT) {
+      const parsed = parseRGBA(col);
+      const lighter = rgbaToStr({r: Math.min(255, parsed.r + 60), g: Math.min(255, parsed.g + 60), b: Math.min(255, parsed.b + 60), a: parsed.a});
+      const darker = rgbaToStr({r: Math.max(0, parsed.r - 30), g: Math.max(0, parsed.g - 30), b: Math.max(0, parsed.b - 30), a: parsed.a});
+      const grad = ctx.createRadialGradient(x - pr*0.25, y - pr*0.25, pr*0.1, x, y, pr);
+      grad.addColorStop(0, lighter); grad.addColorStop(1, darker);
+      ctx.fillStyle = grad;
+    } else { ctx.fillStyle = col; }
+    ctx.beginPath(); ctx.arc(x, y, pr, 0, Math.PI * 2); ctx.fill();
+    // Ring
+    const ringW = Math.max(1, pr * DOMINO_STYLE.PIPFX_RING_WIDTH_RATIO);
+    if (DOMINO_STYLE.PIPFX_RING_OPACITY > 0) {
+      ctx.save(); ctx.globalAlpha = DOMINO_STYLE.PIPFX_RING_OPACITY;
+      ctx.strokeStyle = "rgba(0,0,0,1)"; ctx.lineWidth = ringW;
+      ctx.beginPath(); ctx.arc(x, y, pr - ringW * 0.5, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+    // Highlights
+    const innerR = Math.max(1, pr - ringW);
+    const hi1A = DOMINO_STYLE.PIPFX_HI1_OPACITY;
+    const hi2A = DOMINO_STYLE.PIPFX_HI2_OPACITY;
+    if (hi1A > 0) {
+      const dx = DOMINO_STYLE.PIPFX_HI1_DX * innerR;
+      const dy = DOMINO_STYLE.PIPFX_HI1_DY * innerR;
+      ctx.save(); ctx.globalAlpha = hi1A; ctx.fillStyle = "rgba(255,255,255,1)";
+      ctx.beginPath();
+      if (ctx.ellipse) ctx.ellipse(x+dx, y+dy, innerR*DOMINO_STYLE.PIPFX_HI1_SIZE*0.70, innerR*DOMINO_STYLE.PIPFX_HI1_SIZE*0.55, -0.35, 0, Math.PI*2);
+      else ctx.arc(x+dx, y+dy, innerR*DOMINO_STYLE.PIPFX_HI1_SIZE*0.55, 0, Math.PI*2);
+      ctx.fill(); ctx.restore();
+    }
+    if (hi2A > 0) {
+      const dx = DOMINO_STYLE.PIPFX_HI2_DX * innerR;
+      const dy = DOMINO_STYLE.PIPFX_HI2_DY * innerR;
+      ctx.save(); ctx.globalAlpha = hi2A; ctx.fillStyle = "rgba(255,255,255,1)";
+      ctx.beginPath();
+      if (ctx.ellipse) ctx.ellipse(x+dx, y+dy, innerR*DOMINO_STYLE.PIPFX_HI2_SIZE*0.55, innerR*DOMINO_STYLE.PIPFX_HI2_SIZE*0.45, -0.35, 0, Math.PI*2);
+      else ctx.arc(x+dx, y+dy, innerR*DOMINO_STYLE.PIPFX_HI2_SIZE*0.45, 0, Math.PI*2);
+      ctx.fill(); ctx.restore();
+    }
+  }
+
+  function drawHalf(val, oy){
+    val = Number(val) || 0;
+    const cx = w / 2, cy = oy + hh / 2;
+    const col = pipColorForValue(val);
+    for(const s of (spots[val] || [])){
+      pipFancy(cx + s[0] * sx, cy + s[1] * sy, pr, col);
+    }
+  }
+
+  ctx.save();
+  ctx.globalAlpha = valid ? 1.0 : DOMINO_STYLE.INVALID_OPACITY;
+  drawHalf(tile[0], 0);
+  drawHalf(tile[1], h / 2);
+  ctx.restore();
+}
+
+// ============================================================
+// TILE RENDERING HELPER
+// ============================================================
+function renderTileCanvas(tile, w, h, highlighted){
+  const cvs = document.createElement('canvas');
+  const dpr = window.devicePixelRatio || 1;
+  cvs.width = Math.round(w * dpr);
+  cvs.height = Math.round(h * dpr);
+  cvs.style.width = w + 'px';
+  cvs.style.height = h + 'px';
+  const ctx = cvs.getContext('2d');
+  drawFace(ctx, tile, cvs.width, cvs.height, highlighted, true);
+  return cvs;
+}
+
+// ============================================================
+// GAME STATE MOCK (needed for pure42-ai.js)
+// ============================================================
+var GAME_MODE = 'T42';
+var pure42Mode = true;
+var session = {
+  game: { max_pip: 6, hand_size: 7 },
+  bid_winner_seat: 0
+};
+
+// Stubs for functions that pure42-ai.js routing IIFE expects
+window.evaluateHandForBid = function(hand){ return { action: "pass" }; };
+window.aiChooseTrump = function(hand, bidAmount){ return 0; };
+window.choose_tile_ai = function(){ return 0; };
+
+// ============================================================
+// APP STATE
+// ============================================================
+let currentHand = [];
+let selectedTrump = null;
+let annotations = JSON.parse(localStorage.getItem('hr_annotations') || '[]');
+
+// All 28 tiles in double-6 set
+const ALL_TILES = [];
+for(let i = 0; i <= 6; i++) for(let j = i; j <= 6; j++) ALL_TILES.push([i, j]);
+
+// ============================================================
+// TILE PICKER
+// ============================================================
+function buildPicker(){
+  const picker = document.getElementById('tilePicker');
+  picker.innerHTML = '';
+  for(const tile of ALL_TILES){
+    const div = document.createElement('div');
+    div.className = 'pickTile';
+    const inHand = currentHand.some(t => t[0]===tile[0] && t[1]===tile[1]);
+    if(inHand) div.classList.add('selected');
+    if(!inHand && currentHand.length >= 7) div.classList.add('disabled');
+
+    const cvs = renderTileCanvas(tile, 44, 88, inHand);
+    cvs.style.width = '100%'; cvs.style.height = '100%';
+    div.appendChild(cvs);
+    div.addEventListener('click', () => toggleTile(tile));
+    picker.appendChild(div);
+  }
+}
+
+function toggleTile(tile){
+  const idx = currentHand.findIndex(t => t[0]===tile[0] && t[1]===tile[1]);
+  if(idx >= 0){
+    currentHand.splice(idx, 1);
+  } else if(currentHand.length < 7){
+    currentHand.push(tile);
+  }
+  selectedTrump = null;
+  buildPicker();
+  renderHand();
+  if(currentHand.length === 7) runAnalysis();
+  else hideResults();
+}
+
+// ============================================================
+// HAND DISPLAY WITH TRUMP SORTING
+// ============================================================
+function renderHand(){
+  const area = document.getElementById('handArea');
+  area.innerHTML = '';
+  const sorted = getSortedHand();
+  for(const tile of sorted){
+    const isTrump = isTrumpTile(tile);
+    const div = document.createElement('div');
+    div.className = 'handTile' + (isTrump ? ' trump' : '');
+    const cvs = renderTileCanvas(tile, 52, 104, isTrump);
+    cvs.style.width = '100%'; cvs.style.height = '100%';
+    div.appendChild(cvs);
+    div.addEventListener('click', () => pickTrumpFromTile(tile));
+    area.appendChild(div);
+  }
+}
+
+function isTrumpTile(tile){
+  if(selectedTrump === null) return false;
+  if(selectedTrump === 'NT') return tile[0] === tile[1]; // doubles are trump in NT
+  return tile[0] === selectedTrump || tile[1] === selectedTrump;
+}
+
+function getSortedHand(){
+  if(selectedTrump === null) return currentHand.slice();
+  const trump = selectedTrump;
+
+  return currentHand.slice().sort((a, b) => {
+    const keyA = getSortKey(a, trump);
+    const keyB = getSortKey(b, trump);
+    if(keyA[0] !== keyB[0]) return keyA[0] - keyB[0];
+    return keyA[1] - keyB[1];
+  });
+}
+
+function getSortKey(tile, trump){
+  const highPip = Math.max(tile[0], tile[1]);
+  const lowPip = Math.min(tile[0], tile[1]);
+  const isDouble = tile[0] === tile[1];
+  let isTrump = false, isDoubleTrump = false, otherPip = 0;
+
+  if(trump === 'NT'){
+    if(isDouble){ isTrump = true; isDoubleTrump = true; }
+  } else if(trump !== null && typeof trump === 'number'){
+    if(tile[0] === trump || tile[1] === trump){
+      isTrump = true;
+      isDoubleTrump = isDouble;
+      otherPip = (tile[0] === trump) ? tile[1] : tile[0];
+    }
+  }
+
+  if(isDoubleTrump) return [0, 100 - highPip];
+  if(isTrump) return [1, 100 - otherPip];
+  if(isDouble) return [2, 100 - highPip];
+  return [3, (100 - highPip) * 10 + (100 - lowPip)];
+}
+
+function pickTrumpFromTile(tile){
+  if(currentHand.length < 7) return;
+  // Determine trump suit from clicked tile
+  if(tile[0] === tile[1]){
+    // Clicked a double — toggle that suit or NT
+    if(selectedTrump === tile[0]) { selectedTrump = null; }
+    else { selectedTrump = tile[0]; }
+  } else {
+    // Non-double: pick the higher pip as trump (tap again for lower)
+    const high = Math.max(tile[0], tile[1]);
+    const low = Math.min(tile[0], tile[1]);
+    if(selectedTrump === high) selectedTrump = low;
+    else if(selectedTrump === low) selectedTrump = null;
+    else selectedTrump = high;
+  }
+  renderHand();
+  runAnalysis();
+}
+
+// ============================================================
+// AI ANALYSIS
+// ============================================================
+function runAnalysis(){
+  if(currentHand.length !== 7) return;
+  const panel = document.getElementById('resultsPanel');
+  const content = document.getElementById('resultsContent');
+  panel.style.display = 'block';
+  document.getElementById('annotationArea').style.display = 'block';
+
+  // Run pure42 bidding
+  let result;
+  try {
+    result = pure42_evaluateHandForBid(currentHand);
+  } catch(e) {
+    content.innerHTML = '<div class="result-row"><span class="value">Error: ' + e.message + '</span></div>';
+    return;
+  }
+
+  // Get AI trump choice
+  let aiTrump = null;
+  try {
+    if(result.action === 'bid'){
+      aiTrump = pure42_aiChooseTrump(currentHand, result.bid);
+    }
+  } catch(e) {}
+
+  let html = '';
+  if(result.action === 'bid'){
+    html += '<div class="result-row"><span class="label">Recommendation: </span><span class="bid-value">Bid ' + result.bid + '</span></div>';
+    if(result.marks > 1) html += '<div class="result-row"><span class="label">Marks: </span><span class="value">' + result.marks + 'x</span></div>';
+    const trumpStr = aiTrump === 'NT' ? 'No Trump (Doubles)' : (aiTrump !== null ? aiTrump + 's' : '?');
+    html += '<div class="result-row"><span class="label">Best Trump: </span><span class="value">' + trumpStr + '</span></div>';
+
+    // If user selected a different trump, show comparison
+    if(selectedTrump !== null && selectedTrump !== aiTrump){
+      html += '<div class="result-row" style="color:#f59e0b"><span class="label">Your Trump: </span><span class="value">' + (selectedTrump === 'NT' ? 'NT' : selectedTrump + 's') + ' (AI disagrees)</span></div>';
+    }
+  } else {
+    html += '<div class="result-row"><span class="label">Recommendation: </span><span class="pass-value">Pass</span></div>';
+  }
+
+  // Show trump tiles count and offs
+  if(selectedTrump !== null && selectedTrump !== 'NT'){
+    const trumps = currentHand.filter(t => t[0]===selectedTrump || t[1]===selectedTrump);
+    const doubles = currentHand.filter(t => t[0]===t[1] && t[0]!==selectedTrump);
+    const offs = currentHand.filter(t => t[0]!==t[1] && t[0]!==selectedTrump && t[1]!==selectedTrump);
+    html += '<div class="result-row"><span class="label">Trumps: </span><span class="value">' + trumps.length + '</span></div>';
+    html += '<div class="result-row"><span class="label">Doubles: </span><span class="value">' + doubles.length + '</span></div>';
+    html += '<div class="result-row"><span class="label">Offs: </span><span class="value">' + offs.length + '</span></div>';
+  }
+
+  // Auto-set trump to AI recommendation if user hasn't picked
+  if(selectedTrump === null && aiTrump !== null){
+    selectedTrump = aiTrump;
+    renderHand();
+  }
+
+  content.innerHTML = html;
+}
+
+function hideResults(){
+  document.getElementById('resultsPanel').style.display = 'none';
+  document.getElementById('annotationArea').style.display = 'none';
+}
+
+// ============================================================
+// ANNOTATIONS
+// ============================================================
+function annotate(verdict){
+  const note = document.getElementById('noteInput').value.trim();
+  let result;
+  try { result = pure42_evaluateHandForBid(currentHand); } catch(e){ result = {action:'error'}; }
+  let aiTrump = null;
+  try { if(result.action==='bid') aiTrump = pure42_aiChooseTrump(currentHand, result.bid); } catch(e){}
+
+  const entry = {
+    hand: currentHand.map(t => t[0]+'-'+t[1]),
+    aiBid: result.action === 'bid' ? result.bid : 'pass',
+    aiTrump: aiTrump,
+    userTrump: selectedTrump,
+    verdict: verdict,
+    note: note,
+    timestamp: new Date().toISOString()
+  };
+  annotations.push(entry);
+  localStorage.setItem('hr_annotations', JSON.stringify(annotations));
+  document.getElementById('noteInput').value = '';
+  renderHistory();
+}
+
+function renderHistory(){
+  const list = document.getElementById('historyList');
+  document.getElementById('historyCount').textContent = annotations.length;
+  // Show last 10
+  const recent = annotations.slice(-10).reverse();
+  list.innerHTML = recent.map(a => {
+    const handStr = a.hand.join(', ');
+    return `<div class="history-item ${a.verdict}">
+      <strong>${a.verdict.toUpperCase()}</strong> — Bid: ${a.aiBid}, Trump: ${a.aiTrump || '?'}
+      <br><small>${handStr}</small>
+      ${a.note ? '<br><em>' + a.note + '</em>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function exportAnnotations(){
+  const blob = new Blob([JSON.stringify(annotations, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'hand-annotations.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importAnnotations(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const data = JSON.parse(e.target.result);
+      if(Array.isArray(data)){
+        annotations = annotations.concat(data);
+        localStorage.setItem('hr_annotations', JSON.stringify(annotations));
+        renderHistory();
+      }
+    } catch(err){ alert('Invalid JSON file'); }
+  };
+  reader.readAsText(file);
+}
+
+// ============================================================
+// RANDOM HAND
+// ============================================================
+function randomHand(){
+  const shuffled = ALL_TILES.slice().sort(() => Math.random() - 0.5);
+  currentHand = shuffled.slice(0, 7);
+  selectedTrump = null;
+  buildPicker();
+  renderHand();
+  runAnalysis();
+}
+
+function clearHand(){
+  currentHand = [];
+  selectedTrump = null;
+  buildPicker();
+  renderHand();
+  hideResults();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+buildPicker();
+renderHistory();
+</script>
+
+<!-- Load actual Pure 42 AI engine -->
+<script src="./assets/js/pure42-ai.js"></script>
+
+</body>
+</html>

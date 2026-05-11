@@ -4,9 +4,10 @@
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v13.5.DEV.21';
+const CACHE_NAME = 'tx-dom-v13.5.DEV.22';
 const urlsToCache = [
   './index.html',
+  './hand-reviewer.html',
   './sw.js',
   // CSS
   './assets/css/styles.css',

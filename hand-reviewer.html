@@ -1055,6 +1055,7 @@ function browseAnnotation(dir){
   browseIndex += dir;
   if(browseIndex < 0) browseIndex = annotations.length - 1;
   if(browseIndex >= annotations.length) browseIndex = 0;
+  loadAnnotation(browseIndex);
   renderHistory();
 }
 

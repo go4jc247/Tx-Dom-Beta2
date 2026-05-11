@@ -1050,10 +1050,15 @@ let browseIndex = -1; // -1 = not browsing
 let currentRating = 0;
 
 function previewStars(n){
-  // Light up stars up to n on hover/touch
+  // Each star knows its rating via onclick. Light up that star
+  // and all stars of equal or higher rating (to the left).
+  // Stars in DOM: ★5, ★4, ★3, ★2, ★1 (left to right)
+  // Star index 0=5, 1=4, 2=3, 3=2, 4=1
+  // For rating n, a star's rating = 5 - index. Light if starRating >= n.
   const stars = document.querySelectorAll('#starRating .star');
   for(let i = 0; i < stars.length; i++){
-    stars[i].style.color = i < n ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.4)';
+    const starRating = 5 - i;
+    stars[i].style.color = (n > 0 && starRating >= n) ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.4)';
   }
 }
 

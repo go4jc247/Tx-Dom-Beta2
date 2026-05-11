@@ -4,6 +4,13 @@
 // Includes: Rematch voting system, In-game chat, No Table Talk
 // ============================================================
 
+// ===== LINKIFY HELPER =====
+function _linkifyText(text) {
+  // Escape HTML first to prevent XSS, then convert URLs to clickable links
+  const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#38bdf8;text-decoration:underline">$1</a>');
+}
+
 // ===== REMATCH VOTING SYSTEM (V10_77) =====
 let _rematchVotes = {};
 let _rematchDeclined = false; // V11.4: Track if this guest declined rematch
@@ -325,7 +332,9 @@ function _addChatMessage(msg, isSelf) {
   nameSpan.className = 'chat-name';
   nameSpan.textContent = (isSelf ? 'You' : (msg.name || 'P' + (msg.seat + 1))) + ':';
   div.appendChild(nameSpan);
-  div.appendChild(document.createTextNode(' ' + msg.text));
+  const textSpan = document.createElement('span');
+  textSpan.innerHTML = ' ' + _linkifyText(msg.text);
+  div.appendChild(textSpan);
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   // 24hr auto-expire

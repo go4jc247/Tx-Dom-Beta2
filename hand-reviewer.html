@@ -431,6 +431,43 @@ const ALL_TILES = [];
 for(let i = 0; i <= 6; i++) for(let j = i; j <= 6; j++) ALL_TILES.push([i, j]);
 
 // ============================================================
+// HAND NUMBERING (1 to 1,184,040)
+// Tile rank: 6-6=27, 6-5=26, ... 0-0=0 (standard domino order)
+// Uses combinatorial number system for unique hand index
+// ============================================================
+function tileRank(tile){
+  const hi = Math.max(tile[0], tile[1]);
+  const lo = Math.min(tile[0], tile[1]);
+  // Rank = sum of tiles before this group + position within group
+  // Group for high pip h: starts at index (h*(h+1))/2, tiles are h-0, h-1, ..., h-h
+  // But we want descending order (6-6=27, 0-0=0)
+  const ascending = (hi * (hi + 1)) / 2 + lo; // 0-0=0, 1-0=1, 1-1=2, 2-0=3, ...
+  return ascending;
+}
+
+function choose(n, k){
+  if(k > n || k < 0) return 0;
+  if(k === 0 || k === n) return 1;
+  let result = 1;
+  for(let i = 0; i < k; i++){
+    result = result * (n - i) / (i + 1);
+  }
+  return Math.round(result);
+}
+
+function handNumber(hand){
+  if(hand.length !== 7) return null;
+  // Get ranks, sort descending
+  const ranks = hand.map(t => tileRank(t)).sort((a, b) => b - a);
+  // Combinatorial number system: index = C(r0,7) + C(r1,6) + ... + C(r6,1)
+  let index = 0;
+  for(let i = 0; i < 7; i++){
+    index += choose(ranks[i], 7 - i);
+  }
+  return index + 1; // 1-based
+}
+
+// ============================================================
 // TILE PICKER
 // ============================================================
 function buildPicker(){
@@ -858,6 +895,12 @@ function runAnalysis(){
 
   let html = '';
 
+  // Hand number
+  const hNum = handNumber(currentHand);
+  if(hNum !== null){
+    html += '<div class="result-row"><span class="label">Hand #</span><span class="value">' + hNum.toLocaleString() + '</span><span class="label"> of 1,184,040</span></div>';
+  }
+
   // Auto-set trump to AI recommendation if user hasn't picked
   if(selectedTrump === null && aiTrump !== null){
     selectedTrump = aiTrump;
@@ -935,6 +978,7 @@ function annotate(verdict){
   const trumpForRange = selectedTrump !== null ? selectedTrump : aiTrump;
   const range = analyzeBidRange(currentHand, trumpForRange);
   const entry = {
+    handNum: handNumber(currentHand),
     hand: currentHand.map(t => t[0]+'-'+t[1]),
     aiBid: result.action === 'bid' ? result.bid : 'pass',
     aiTrump: aiTrump,

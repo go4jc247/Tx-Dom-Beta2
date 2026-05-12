@@ -948,9 +948,9 @@ const TILE_LONG  = 0.14;
 const TILE_SHORT = 0.07;
 const TILE_THICK = 0.018;
 
-let PLAYER_COUNT  = 6;  // mutable: 2..6
-let HAND_SIZE     = 6;  // mutable: depends on deck size and player count
-let MAX_PIP       = 7;  // mutable: 6/7/8/9 (or any number with custom set)
+let PLAYER_COUNT  = 4;  // T42 mode: 4 players
+let HAND_SIZE     = 7;  // T42: 28 tiles / 4 players = 7 each
+let MAX_PIP       = 6;  // T42: double-6 set
 let R_TABLE       = 1.45; // mutable: felt-radius reference
 
 // Game state (declared early because buildInitialRacks reads hands via
@@ -2509,7 +2509,7 @@ const GAME_MODES = {
   BLOCK:     'block',
   TEXAS_42:  'texas42'
 };
-let gameMode = GAME_MODES.ALL_FIVES;
+let gameMode = GAME_MODES.TEXAS_42;
 // Cumulative scores per player across the whole match.
 let scores = new Array(PLAYER_COUNT).fill(0);
 // Score needed to win the match. Default 150, customizable in settings.

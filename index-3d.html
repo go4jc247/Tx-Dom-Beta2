@@ -2575,8 +2575,8 @@ function t42_trickSlotQuat(seatIdx, isLeader) {
 // Tricks grow left to right. Team 0 on left side, Team 1 on right.
 // All tiles face-up, horizontal [|], in a tight grid.
 const T42_TRICK_GRID = {
-  tileW: TILE_SHORT + 0.005,   // column spacing (short side + gap, tiles are rotated)
-  tileH: TILE_LONG + 0.003,    // row spacing (long side + gap)
+  tileW: TILE_SHORT,            // column spacing (no padding)
+  tileH: TILE_LONG,             // row spacing (no padding)
   startZ: -(R_TABLE * 0.45),   // far side of table
   team0X: -0.35,               // team 0 starts left
   team1X: 0.10                 // team 1 starts right

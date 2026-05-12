@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TX 42 - 3D Table (POC)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; }
+    canvas { display: block; touch-action: none; }
+    #info {
+      position: absolute; bottom: 10px; left: 10px;
+      color: #aaa; font-family: monospace; font-size: 13px;
+      pointer-events: none;
+    }
+    #crosshair {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      color: #fff; font-size: 24px;
+      pointer-events: none; display: none;
+    }
+  </style>
+</head>
+<body>
+<div id="info">Click: enable | WASD: walk | Mouse: look | Shift: run | Space: rise | Ctrl: lower | ESC: release</div>
+<div id="crosshair">+</div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- Your exact 3D assets — untouched -->
+<script src="./assets/js/3d/textures.js"></script>
+<script src="./assets/js/3d/domino.js"></script>
+<script src="./assets/js/3d/table.js"></script>
+<script src="./assets/js/3d/rack.js"></script>
+<script src="./assets/js/3d/chandelier.js"></script>
+<script src="./assets/js/3d/chair.js"></script>
+
+<script>
+// ========== SCENE SETUP (exact copy from your index.html) ==========
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const FLOOR_Z = -700;
+const EYE_HEIGHT = 1600;
+const CAM_Z = FLOOR_Z + EYE_HEIGHT;
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 8000);
+camera.position.set(-508, -963, 422);
+camera.up.set(0, 0, 1); // Z is up
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+let renderScale = window.devicePixelRatio;
+renderer.setPixelRatio(renderScale);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.localClippingEnabled = true;
+document.body.appendChild(renderer.domElement);
+
+// ========== FPS CONTROLS (exact copy) ==========
+const crosshair = document.getElementById('crosshair');
+let isLocked = false;
+let yaw = 62 * Math.PI / 180;
+let pitch = -31 * Math.PI / 180;
+const PITCH_MAX = Math.PI / 2 - 0.05;
+
+renderer.domElement.addEventListener('click', () => {
+  if (!isLocked) renderer.domElement.requestPointerLock();
+});
+document.addEventListener('pointerlockchange', () => {
+  isLocked = document.pointerLockElement === renderer.domElement;
+  crosshair.style.display = isLocked ? 'block' : 'none';
+});
+document.addEventListener('mousemove', (e) => {
+  if (!isLocked) return;
+  yaw -= e.movementX * 0.002;
+  pitch -= e.movementY * 0.002;
+  pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, pitch));
+});
+
+// Touch look
+let touchStartX = 0, touchStartY = 0, isTouchLooking = false;
+renderer.domElement.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    isTouchLooking = true;
+  }
+}, { passive: true });
+renderer.domElement.addEventListener('touchmove', (e) => {
+  if (!isTouchLooking || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - touchStartX;
+  const dy = e.touches[0].clientY - touchStartY;
+  yaw -= dx * 0.003;
+  pitch -= dy * 0.003;
+  pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, pitch));
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  e.preventDefault();
+}, { passive: false });
+
+// Movement
+const moveState = { forward: false, backward: false, left: false, right: false, sprint: false, up: false, down: false };
+const walkSpeed = 600;
+const clock = new THREE.Clock();
+
+window.addEventListener('keydown', (e) => {
+  switch (e.code) {
+    case 'KeyW': case 'ArrowUp':    moveState.forward = true; break;
+    case 'KeyS': case 'ArrowDown':  moveState.backward = true; break;
+    case 'KeyA': case 'ArrowLeft':  moveState.left = true; break;
+    case 'KeyD': case 'ArrowRight': moveState.right = true; break;
+    case 'ShiftLeft': case 'ShiftRight': moveState.sprint = true; break;
+    case 'Space': moveState.up = true; e.preventDefault(); break;
+    case 'ControlLeft': case 'ControlRight': moveState.down = true; break;
+  }
+});
+window.addEventListener('keyup', (e) => {
+  switch (e.code) {
+    case 'KeyW': case 'ArrowUp':    moveState.forward = false; break;
+    case 'KeyS': case 'ArrowDown':  moveState.backward = false; break;
+    case 'KeyA': case 'ArrowLeft':  moveState.left = false; break;
+    case 'KeyD': case 'ArrowRight': moveState.right = false; break;
+    case 'ShiftLeft': case 'ShiftRight': moveState.sprint = false; break;
+    case 'Space': moveState.up = false; break;
+    case 'ControlLeft': case 'ControlRight': moveState.down = false; break;
+  }
+});
+
+// ========== LIGHTS (exact copy) ==========
+const ambient = new THREE.AmbientLight(0xffe8cc, 0.3);
+scene.add(ambient);
+
+const chandelierLight = new THREE.SpotLight(0xffeedd, 1.0);
+chandelierLight.position.set(0, 0, 1000);
+chandelierLight.angle = Math.PI / 3.5;
+chandelierLight.penumbra = 0.6;
+chandelierLight.decay = 1.5;
+chandelierLight.castShadow = true;
+chandelierLight.shadow.mapSize.width = 2048;
+chandelierLight.shadow.mapSize.height = 2048;
+scene.add(chandelierLight);
+scene.add(chandelierLight.target);
+
+const chandelierFill = new THREE.PointLight(0xffd4a0, 0.4);
+chandelierFill.position.set(0, 0, 900);
+scene.add(chandelierFill);
+
+const fill1 = new THREE.PointLight(0xffeedd, 0.25);
+fill1.position.set(-800, -800, 600);
+scene.add(fill1);
+
+const fill2 = new THREE.PointLight(0xffeedd, 0.25);
+fill2.position.set(800, -800, 600);
+scene.add(fill2);
+
+const fill3 = new THREE.PointLight(0xffeedd, 0.2);
+fill3.position.set(0, 800, 400);
+scene.add(fill3);
+
+const roomFill = new THREE.HemisphereLight(0x8888aa, 0x444422, 0.15);
+scene.add(roomFill);
+
+// ========== BUILD SCENE ==========
+const materials = createAllMaterials();
+
+// Table
+const table = createTable(materials.woodMat, materials.feltMat, materials.railMat, materials.floorTex);
+scene.add(table);
+
+// Chandelier
+const chandelier = createChandelier();
+chandelier.position.set(0, 0, 800);
+scene.add(chandelier);
+
+// Chairs (6 seats around hex table)
+for (let i = 0; i < 6; i++) {
+  const angle = (i * 60 + 30) * Math.PI / 180;
+  const chairDist = TABLE_RADIUS + 350;
+  const chair = createChair(materials.chairMat);
+  chair.position.set(
+    chairDist * Math.cos(angle),
+    chairDist * Math.sin(angle),
+    FLOOR_Z
+  );
+  chair.rotation.z = angle - Math.PI / 2;
+  scene.add(chair);
+}
+
+// Racks (6 around table, on the rail)
+const racks = [];
+for (let i = 0; i < 6; i++) {
+  const angle = (i * 60 + 30) * Math.PI / 180;
+  const rackDist = TABLE_RADIUS - 200;
+  const rack = createRack(materials.rackMat);
+  rack.position.set(
+    rackDist * Math.cos(angle),
+    rackDist * Math.sin(angle),
+    TOP_THICKNESS + 7
+  );
+  rack.rotation.z = angle - Math.PI / 2;
+  rack.castShadow = true;
+  scene.add(rack);
+  racks.push(rack);
+}
+
+// ========== DEAL DOMINOES ON PLAYER'S RACK ==========
+// Place 7 random dominoes standing on the nearest rack (seat 0)
+const allTiles = [];
+for (let i = 0; i <= 6; i++) for (let j = i; j <= 6; j++) allTiles.push([i, j]);
+// Shuffle and take 7
+for (let i = allTiles.length - 1; i > 0; i--) {
+  const j = Math.floor(Math.random() * (i + 1));
+  [allTiles[i], allTiles[j]] = [allTiles[j], allTiles[i]];
+}
+const hand = allTiles.slice(0, 7);
+
+// Player seat is seat 0 (angle = 30 degrees)
+const playerAngle = 30 * Math.PI / 180;
+const rackDist = TABLE_RADIUS - 200;
+const rackX = rackDist * Math.cos(playerAngle);
+const rackY = rackDist * Math.sin(playerAngle);
+const rackZ = TOP_THICKNESS + 7;
+
+for (let i = 0; i < hand.length; i++) {
+  const dom = createStandingDomino(hand[i][0], hand[i][1]);
+  // Space dominoes along the rack
+  const spacing = 28;
+  const totalWidth = (hand.length - 1) * spacing;
+  const localX = -totalWidth / 2 + i * spacing;
+
+  // Position relative to rack, then rotate to match rack orientation
+  const cos = Math.cos(playerAngle - Math.PI / 2);
+  const sin = Math.sin(playerAngle - Math.PI / 2);
+  dom.position.set(
+    rackX + localX * cos,
+    rackY + localX * sin,
+    rackZ + 20
+  );
+  dom.rotation.z = playerAngle - Math.PI / 2;
+  dom.castShadow = true;
+  scene.add(dom);
+}
+
+// Fix clipping planes for domino frames (from your pendingFrames pattern)
+for (const frame of pendingFrames) {
+  if (frame._localPlaneData) {
+    const { innerX, innerY } = frame._localPlaneData;
+    const localPlanes = [
+      new THREE.Plane(new THREE.Vector3(-1, 0, 0), -innerX),
+      new THREE.Plane(new THREE.Vector3(1, 0, 0), -innerX),
+      new THREE.Plane(new THREE.Vector3(0, -1, 0), -innerY),
+      new THREE.Plane(new THREE.Vector3(0, 1, 0), -innerY),
+    ];
+    frame.material.clippingPlanes = localPlanes;
+  }
+}
+
+// ========== RESIZE ==========
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ========== ANIMATION LOOP ==========
+function animate() {
+  requestAnimationFrame(animate);
+
+  const delta = clock.getDelta();
+  const speed = walkSpeed * (moveState.sprint ? 2.5 : 1) * delta;
+
+  // Forward direction (in XY plane, Z is up)
+  const fwd = new THREE.Vector3(Math.cos(yaw), Math.sin(yaw), 0);
+  const right = new THREE.Vector3(Math.cos(yaw - Math.PI/2), Math.sin(yaw - Math.PI/2), 0);
+
+  if (moveState.forward) camera.position.add(fwd.clone().multiplyScalar(speed));
+  if (moveState.backward) camera.position.add(fwd.clone().multiplyScalar(-speed));
+  if (moveState.left) camera.position.add(right.clone().multiplyScalar(-speed));
+  if (moveState.right) camera.position.add(right.clone().multiplyScalar(speed));
+  if (moveState.up) camera.position.z += speed;
+  if (moveState.down) camera.position.z -= speed;
+
+  // Look direction
+  const lookDir = new THREE.Vector3(
+    Math.cos(yaw) * Math.cos(pitch),
+    Math.sin(yaw) * Math.cos(pitch),
+    Math.sin(pitch)
+  );
+  camera.lookAt(camera.position.clone().add(lookDir));
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

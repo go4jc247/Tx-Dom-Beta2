@@ -2575,8 +2575,8 @@ function t42_trickSlotQuat(seatIdx, isLeader) {
 // Tricks grow left to right. Team 0 on left side, Team 1 on right.
 // All tiles face-up, horizontal [|], in a tight grid.
 const T42_TRICK_GRID = {
-  tileW: TILE_LONG + 0.005,    // column spacing (tile width + small gap)
-  tileH: TILE_SHORT + 0.003,   // row spacing (tile height + small gap)
+  tileW: TILE_SHORT + 0.005,   // column spacing (short side + gap, tiles are rotated)
+  tileH: TILE_LONG + 0.003,    // row spacing (long side + gap)
   startZ: -(R_TABLE * 0.45),   // far side of table
   team0X: -0.35,               // team 0 starts left
   team1X: 0.10                 // team 1 starts right
@@ -2619,8 +2619,8 @@ function t42_animateCollectTrick(winnerSeat, onDone) {
   let completed = 0;
   const total = t42_currentTrick.length;
 
-  // Tile orientation: horizontal face-up (same as in center)
-  const gridQuat = QUAT_PERP_A_PLUS_Z.clone();
+  // Tile orientation: horizontal face-up, long axis along X
+  const gridQuat = QUAT_FLAT_NORMAL.clone();
 
   for (let i = 0; i < total; i++) {
     const entry = t42_currentTrick[i];

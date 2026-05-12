@@ -495,6 +495,49 @@ function handNumber(hand){
 }
 
 // ============================================================
+// EXPERT ANNOTATIONS (hardcoded from user reviews)
+// t=trump, r=rating(1-5), v=verdict(c/w/o), b=bid opinion, n=note
+// ============================================================
+const EXPERT_NOTES = {
+  50484:{t:0,r:4,v:'c',b:'P-30',n:'30 would be absolute max and risky. Better off passing.'},
+  71874:{t:4,r:4,v:'c',b:'r30',n:'Risky 30.'},
+  78381:{t:0,r:0,v:'w',b:'P-30',n:'Missing 0-5, 4 trumps but risky. Max 30-31, 32 slightly risky.'},
+  94837:{t:5,r:5,v:'c',b:'P'},
+  450714:{t:2,r:5,v:'c',b:'P'},
+  470272:{t:0,r:5,v:'c',b:'r30'},
+  473386:{t:0,r:5,v:'c',b:'P'},
+  492286:{t:1,r:5,v:'c',b:'P'},
+  558825:{t:2,r:5,v:'c',b:'P'},
+  589606:{t:2,r:4,v:'c',b:'r30',n:'Excellent hand except offs are terrible. Risky 30, 33 is very high.'},
+  607245:{t:6,r:0,v:'w',b:'r31',n:'Only 3 trumps, no double. 3 doubles but offs risky.'},
+  615880:{t:3,r:5,v:'c',b:'P',n:'Risk taker might bid, but really should pass.'},
+  748611:{t:2,r:5,v:'c',b:'P'},
+  757526:{t:6,r:5,v:'c',b:'P'},
+  811345:{t:3,r:5,v:'c',b:'r30'},
+  833012:{t:2,r:5,v:'c',b:'30',n:'Normal 30, risky 31, 32 very risky. 41 insane.'},
+  851585:{t:4,r:5,v:'c',b:'30-32',n:'Lead 6-5, no count in 6s. Strong if trumps pulled.'},
+  854014:{t:5,r:4,v:'c',b:'r31',n:'Risky bid would be 31.'},
+  873451:{t:6,r:4,v:'c',b:'30',n:'Doable 30 with luck. Must evaluate every play carefully.'},
+  939404:{t:4,r:4,v:'c',b:'P-30',n:'Safe pass, normal 30, risky 31.'},
+  961904:{t:2,r:0,v:'c',b:'r30',n:'Risky 30. Could get lucky. 3 trumps, nice offs.'},
+  1067143:{t:'NT',r:4,v:'c',b:'30-42',n:'Excellent NT hand. Play doubles in order to pull suits.'},
+  1084871:{t:4,r:0,v:'c',b:'r30'},
+  1146589:{t:1,r:4,v:'c',b:'r30',n:'4 trumps, 6-6, strong but missing double 1. Not half bad.'},
+  1147644:{t:6,r:5,v:'c',b:'P'},
+  1151372:{t:6,r:4,v:'c',b:'30',n:'Offs terrible, but sometimes you get lucky.'},
+  1172536:{t:6,r:5,v:'c',b:'r31',n:'Top 3 trumps, 2 fours, 6-4 safe. 31 and 02 are offs.'},
+  1173475:{t:6,r:0,v:'c',b:'r30'},
+  1173996:{t:2,r:4,v:'c',b:'r30',n:'Weak trumps but nice offs. Top 3 sixes.'},
+  1175254:{t:5,r:4,v:'c',b:'r30',n:'Highly risky 30. Many 5s but missing double 5.'},
+  1176904:{t:6,r:0,v:'c',b:'30-31',n:'Top 3 trumps, double 5, good 5 control. Safe 30, risky 32-35.'},
+  1176985:{t:2,r:5,v:'c',b:'30',n:'Strong non-trumps, weak trumps. Playable 30.'},
+  1177053:{t:'NT',r:5,v:'c',b:'42',n:'Excellent NT hand. 4 doubles + top 2 sixes. Bid 84/2x.'},
+  1182812:{t:6,r:4,v:'c',b:'r30',n:'Very risky 30. Strong trumps but many ways to lose.'},
+  1183319:{t:6,r:4,v:'c',b:'84',n:'Safe 36, but really an 84/2x hand. Covered 5 off.'},
+};
+const EXPERT_EVALUATED = new Set(Object.keys(EXPERT_NOTES).map(Number));
+
+// ============================================================
 // TILE PICKER
 // ============================================================
 function buildPicker(){
@@ -974,6 +1017,22 @@ function runAnalysis(){
     }
   }
 
+  // Show expert annotation if available
+  if(hNum && EXPERT_NOTES[hNum]){
+    const ex = EXPERT_NOTES[hNum];
+    const starStr = ex.r > 0 ? '★'.repeat(ex.r) + '☆'.repeat(5-ex.r) : '';
+    const vColor = ex.v === 'c' ? '#22c55e' : ex.v === 'w' ? '#ef4444' : '#eab308';
+    const vText = ex.v === 'c' ? 'CORRECT' : ex.v === 'w' ? 'WRONG' : 'OK';
+    const trumpStr = ex.t === 'NT' ? 'NT' : ex.t === '-' ? 'none' : ex.t + 's';
+    html += '<div style="margin:4px 0 8px;padding:6px 8px;background:#1a2332;border-radius:6px;border-left:3px solid #eab308;font-size:12px;color:#cbd5e1">';
+    html += '<div style="color:#eab308;font-weight:700;margin-bottom:2px">Expert Review</div>';
+    html += '<span style="color:' + vColor + ';font-weight:600">' + vText + '</span> ' + starStr;
+    html += ' — Trump: ' + trumpStr;
+    if(ex.b) html += ' — Bid: <strong>' + ex.b + '</strong>';
+    if(ex.n) html += '<div style="margin-top:3px;font-style:italic;color:#94a3b8">' + ex.n + '</div>';
+    html += '</div>';
+  }
+
   // Auto-set trump to AI recommendation if user hasn't picked
   if(selectedTrump === null && aiTrump !== null){
     selectedTrump = aiTrump;
@@ -1175,7 +1234,8 @@ function randomHand(){
     const shuffled = ALL_TILES.slice().sort(() => Math.random() - 0.5);
     const candidate = shuffled.slice(0, 7);
     const key = candidate.map(t => Math.min(t[0],t[1])+'-'+Math.max(t[0],t[1])).sort().join(',');
-    if(!evaluatedKeys.has(key)){
+    const hNum = handNumber(candidate);
+    if(!evaluatedKeys.has(key) && !EXPERT_EVALUATED.has(hNum)){
       currentHand = candidate;
       selectedTrump = null;
       buildPicker();

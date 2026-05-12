@@ -708,8 +708,8 @@
       <h3>Rack</h3>
       <div class="control-row">
         <span class="lbl">Tilt</span>
-        <input type="range" id="rackTilt" min="-25" max="25" step="0.5" value="0">
-        <span class="val" id="rackTiltVal">0°</span>
+        <input type="range" id="rackTilt" min="-25" max="25" step="0.5" value="-15">
+        <span class="val" id="rackTiltVal">-15°</span>
       </div>
     </div>
     <div class="settings-section">
@@ -1350,7 +1350,7 @@ const woodMat = new THREE.MeshStandardMaterial({
 // Rack tilt — tilts the base+lip+tiles back toward the table center,
 // pivoting around the front-bottom edge of the base. 0 = flat (upright
 // tiles). Positive radians = back drops down. Live-updated by settings slider.
-let rackTiltRad = 0; // default 0° (flat seat, vertical lip)
+let rackTiltRad = -15 * Math.PI / 180; // default -15°
 
 function playerAngle(p) {
   // Player 0 (you) is always at +Z. Other players are placed around the

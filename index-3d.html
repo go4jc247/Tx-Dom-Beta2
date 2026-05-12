@@ -2571,20 +2571,24 @@ function t42_trickSlotQuat(seatIdx, isLeader) {
   return QUAT_PERP_A_PLUS_Z.clone();
 }
 
-// Trick history: collected tricks go to one of two areas at the far side
-// of the table (near seat 2 / -Z region), mimicking TX-Dom's top-of-screen
-// trick history. Team 0 on the left, Team 1 on the right.
-// Each trick is a small stack of 4 face-down tiles in a compact row.
-function t42_trickPilePos(teamIdx, trickNum) {
-  // Spread tricks in a row along X, starting from center outward
-  const COL_SPACING = 0.10;
-  const teamX = teamIdx === 0 ? -0.25 : 0.25;
-  const col = trickNum % 4;
-  const row = Math.floor(trickNum / 4);
-  const x = teamX + (col - 1.5) * COL_SPACING;
-  const z = -(R_TABLE * 0.55) + row * 0.08; // far side of table
-  const stackY = BOARD_Y + 0.001;
-  return new THREE.Vector3(x, stackY, z);
+// Trick history grid: each trick = column of 4 tiles (one per player).
+// Tricks grow left to right. Team 0 on left side, Team 1 on right.
+// All tiles face-up, horizontal [|], in a tight grid.
+const T42_TRICK_GRID = {
+  tileW: TILE_LONG + 0.005,    // column spacing (tile width + small gap)
+  tileH: TILE_SHORT + 0.003,   // row spacing (tile height + small gap)
+  startZ: -(R_TABLE * 0.45),   // far side of table
+  team0X: -0.35,               // team 0 starts left
+  team1X: 0.10                 // team 1 starts right
+};
+
+// Position for a single tile in the trick history grid
+// teamIdx: 0 or 1, trickNum: which trick (0-based), playerRow: 0-3
+function t42_trickGridPos(teamIdx, trickNum, playerRow) {
+  const baseX = teamIdx === 0 ? T42_TRICK_GRID.team0X : T42_TRICK_GRID.team1X;
+  const x = baseX + trickNum * T42_TRICK_GRID.tileW;
+  const z = T42_TRICK_GRID.startZ + playerRow * T42_TRICK_GRID.tileH;
+  return new THREE.Vector3(x, BOARD_Y + 0.002, z);
 }
 
 // Animate a tile from hand → center trick slot
@@ -2606,44 +2610,32 @@ function t42_animatePlayToCenter(tile, seatIdx, isLeader, onDone) {
   });
 }
 
-// Animate all 4 trick tiles from center → winner's trick pile
+// Animate all 4 trick tiles from center → trick history grid
+// Tiles stay face-up, arranged in a column (one per player row)
 function t42_animateCollectTrick(winnerSeat, onDone) {
   const teamIdx = t42_teamOf(winnerSeat);
-  const pileIdx = t42_trickPiles[teamIdx].length;
+  const trickNum = t42_trickHistory[teamIdx].length - 1; // already pushed before this call
 
   let completed = 0;
   const total = t42_currentTrick.length;
 
+  // Tile orientation: horizontal face-up (same as in center)
+  const gridQuat = QUAT_PERP_A_PLUS_Z.clone();
+
   for (let i = 0; i < total; i++) {
     const entry = t42_currentTrick[i];
-    const pilePos = t42_trickPilePos(teamIdx, pileIdx);
-    // All tiles converge to approximately the same pile position
-    // but with a slight per-tile offset so they fan out
-    const offsetPos = pilePos.clone();
-    offsetPos.x += (i - 1.5) * 0.02;
-    offsetPos.z += (i - 1.5) * 0.015;
-
-    // Flip face-down as they go to the pile
-    const pileQuat = QUAT_FLAT_NORMAL.clone();
+    // Each tile goes to its player's row in the trick column
+    const gridPos = t42_trickGridPos(teamIdx, trickNum, i);
 
     tween(entry.mesh, {
-      endPos: offsetPos,
-      endQuat: pileQuat,
+      endPos: gridPos,
+      endQuat: gridQuat,
       duration: 0.4,
       delay: i * 0.06,
       arcHeight: 0.08,
       onDone: () => {
-        // Swap to back mesh to save GPU (pile tiles don't need pip faces)
-        const pos = entry.mesh.position.clone();
-        const q = entry.mesh.quaternion.clone();
-        scene.remove(entry.mesh);
-        const backMesh = makeTileBackMesh();
-        backMesh.position.copy(pos);
-        backMesh.quaternion.copy(q);
-        scene.add(backMesh);
-        entry.mesh = backMesh;
-        t42_trickPiles[teamIdx].push(backMesh);
-
+        // Keep face-up mesh (no swap to back)
+        t42_trickPiles[teamIdx].push(entry.mesh);
         completed++;
         if (completed === total && onDone) onDone();
       }

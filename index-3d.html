@@ -2555,30 +2555,24 @@ function t42_trickSlotPos(seatIdx, isLeader) {
     // Leader's tile goes to dead center
     return new THREE.Vector3(0, BOARD_Y + 0.001, 0);
   }
-  // Followers surround the center tile in a cross pattern
-  const angle = playerAngle(seatIdx);
-  return new THREE.Vector3(
-    Math.sin(angle) * T42_CENTER_SPREAD,
-    BOARD_Y,
-    Math.cos(angle) * T42_CENTER_SPREAD
-  );
+  // Followers arranged in diamond: each seat offset toward their position
+  // but tighter together (matching 2D layout proportions)
+  // Seat 0 = near (+Z), Seat 1 = right (+X), Seat 2 = far (-Z), Seat 3 = left (-X)
+  const offsets = [
+    new THREE.Vector3(0, 0, T42_CENTER_SPREAD),        // P0: below center (toward you)
+    new THREE.Vector3(T42_CENTER_SPREAD, 0, 0),        // P1: right of center
+    new THREE.Vector3(0, 0, -T42_CENTER_SPREAD),       // P2: above center (far)
+    new THREE.Vector3(-T42_CENTER_SPREAD, 0, 0)        // P3: left of center
+  ];
+  const seatOffset = offsets[seatIdx % 4] || offsets[0];
+  return new THREE.Vector3(seatOffset.x, BOARD_Y, seatOffset.z);
 }
 
-// Flat quaternion for trick tiles. All tiles lie flat face-up.
-// Leader tile is oriented upright (long axis along Z = QUAT_FLAT_NORMAL).
-// Follower tiles are rotated 90° (long axis perpendicular to the line from
-// center toward the follower's seat) so they "point" toward the center.
+// All trick tiles lie flat face-up, oriented HORIZONTALLY (long axis along X).
+// This matches the 2D game where all played tiles use rotZ:270 (horizontal).
 function t42_trickSlotQuat(seatIdx, isLeader) {
-  if (isLeader) {
-    // Lead domino upright (long axis along X) matching TX-Dom's rotZ:0
-    return QUAT_FLAT_NORMAL.clone();
-  }
-  // Followers: rotate so the tile's long axis is perpendicular to
-  // the radial line from center to seat (like the 2D layout's rotZ:270).
-  const angle = playerAngle(seatIdx);
-  return new THREE.Quaternion()
-    .setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle + Math.PI / 2)
-    .multiply(QUAT_FLAT_NORMAL);
+  // All tiles same orientation: flat, horizontal (long axis along X)
+  return QUAT_FLAT_NORMAL.clone();
 }
 
 // Trick history: collected tricks go to one of two areas at the far side

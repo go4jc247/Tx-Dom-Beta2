@@ -2551,28 +2551,24 @@ function t42_teamOf(p) { return p % 2; }
 // These match the player seating (seat 0 at +Z, going CCW).
 const T42_CENTER_SPREAD = 0.11; // distance from center to each played tile
 function t42_trickSlotPos(seatIdx, isLeader) {
-  if (isLeader) {
-    // Leader's tile goes to dead center
-    return new THREE.Vector3(0, BOARD_Y + 0.001, 0);
-  }
-  // Followers arranged in diamond: each seat offset toward their position
-  // but tighter together (matching 2D layout proportions)
+  // All 4 tiles in a cross/plus pattern — no special center lead position.
+  // Each player's tile goes to their seat's spot in the cross.
   // Seat 0 = near (+Z), Seat 1 = right (+X), Seat 2 = far (-Z), Seat 3 = left (-X)
   const offsets = [
-    new THREE.Vector3(0, 0, T42_CENTER_SPREAD),        // P0: below center (toward you)
-    new THREE.Vector3(T42_CENTER_SPREAD, 0, 0),        // P1: right of center
-    new THREE.Vector3(0, 0, -T42_CENTER_SPREAD),       // P2: above center (far)
-    new THREE.Vector3(-T42_CENTER_SPREAD, 0, 0)        // P3: left of center
+    new THREE.Vector3(0, 0, T42_CENTER_SPREAD),        // P0 (you): bottom
+    new THREE.Vector3(T42_CENTER_SPREAD, 0, 0),        // P1: right
+    new THREE.Vector3(0, 0, -T42_CENTER_SPREAD),       // P2: top (across)
+    new THREE.Vector3(-T42_CENTER_SPREAD, 0, 0)        // P3: left
   ];
   const seatOffset = offsets[seatIdx % 4] || offsets[0];
-  return new THREE.Vector3(seatOffset.x, BOARD_Y, seatOffset.z);
+  return new THREE.Vector3(seatOffset.x, BOARD_Y + 0.001, seatOffset.z);
 }
 
-// All trick tiles lie flat face-up, oriented HORIZONTALLY (long axis along X).
-// This matches the 2D game where all played tiles use rotZ:270 (horizontal).
+// All trick tiles flat face-up, VERTICAL orientation (long axis along Z).
+// From player's perspective all tiles appear as [|] portrait orientation.
 function t42_trickSlotQuat(seatIdx, isLeader) {
-  // All tiles same orientation: flat, horizontal (long axis along X)
-  return QUAT_FLAT_NORMAL.clone();
+  // Vertical: long axis along Z (perpendicular to X)
+  return QUAT_PERP_A_PLUS_Z.clone();
 }
 
 // Trick history: collected tricks go to one of two areas at the far side

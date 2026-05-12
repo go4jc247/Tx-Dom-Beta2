@@ -2556,9 +2556,9 @@ function t42_trickSlotPos(seatIdx, isLeader) {
   // Seat 0 = near (+Z), Seat 1 = right (+X), Seat 2 = far (-Z), Seat 3 = left (-X)
   const offsets = [
     new THREE.Vector3(0, 0, T42_CENTER_SPREAD),        // P0 (you): bottom
-    new THREE.Vector3(T42_CENTER_SPREAD, 0, 0),        // P1: right
+    new THREE.Vector3(-T42_CENTER_SPREAD, 0, 0),       // P1: left
     new THREE.Vector3(0, 0, -T42_CENTER_SPREAD),       // P2: top (across)
-    new THREE.Vector3(-T42_CENTER_SPREAD, 0, 0)        // P3: left
+    new THREE.Vector3(T42_CENTER_SPREAD, 0, 0)         // P3: right
   ];
   const seatOffset = offsets[seatIdx % 4] || offsets[0];
   return new THREE.Vector3(seatOffset.x, BOARD_Y + 0.001, seatOffset.z);

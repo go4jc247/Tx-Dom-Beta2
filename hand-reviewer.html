@@ -844,6 +844,29 @@ function analyzeBidRange(hand, trumpPip){
   if(normalBid < safeBid) normalBid = safeBid;
   if(riskyBid < normalBid) riskyBid = normalBid;
 
+  // ── RISKY CAP: when safe=pass, risky should never exceed 30-31 ──
+  // Real players don't jump from "can't bid" to "bid 35"
+  if(safeBid < 30){
+    if(riskyBid > 31) riskyBid = 31;
+    if(normalBid > 30) normalBid = 30;
+  }
+
+  // ── BIDDABLE DETECTION: hands that show all-pass but have a path ──
+  // 3+ trumps with some structure = at least risky 30
+  if(riskyBid < 30 && trumpCount >= 3){
+    const hasStructure = hasDoubleTrump || nonTrumpDoubles.length >= 1 || trumpCount >= 4;
+    if(hasStructure) riskyBid = 30;
+  }
+  // Only upgrade NORMAL to 30 for genuinely strong hands
+  if(normalBid < 30 && safeBid < 30){
+    if(hasDoubleTrump && trumpCount >= 4 && nonTrumpDoubles.length >= 1) normalBid = 30;
+    else if(topTrumpsHeld >= 3 && nonTrumpDoubles.length >= 1) normalBid = 30;
+  }
+
+  // Re-enforce monotonicity after adjustments
+  if(normalBid < safeBid) normalBid = safeBid;
+  if(riskyBid < normalBid) riskyBid = normalBid;
+
   // ── DOMINANT HAND DETECTION ──
   if(topTrumpsHeld >= trumpCount && trumpCount >= 3 && offs.length === 0){
     safeBid = 42; normalBid = 42; riskyBid = 42;

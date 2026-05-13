@@ -2900,6 +2900,18 @@ const SCOREBOARD = {
 };
 
 function createScoreboard() {
+  // Preload fonts for canvas — canvas won't use @font-face until the font is loaded
+  const preload1 = document.createElement('div');
+  preload1.style.cssText = 'position:absolute;top:-9999px;font-family:ChalkBold;font-size:1px;';
+  preload1.textContent = 'x';
+  document.body.appendChild(preload1);
+  const preload2 = document.createElement('div');
+  preload2.style.cssText = 'position:absolute;top:-9999px;font-family:ChalkFont;font-size:1px;';
+  preload2.textContent = 'x';
+  document.body.appendChild(preload2);
+  // Delay first draw to let fonts load
+  setTimeout(() => { updateScoreboard(); }, 500);
+
   const canvas = document.createElement('canvas');
   canvas.width = 1024; canvas.height = 576;
   scoreboardCtx = canvas.getContext('2d');

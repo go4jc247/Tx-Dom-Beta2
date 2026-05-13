@@ -3019,8 +3019,8 @@ function updateScoreboard() {
   const yourTeam = t42_teamOf(PLAYER_IDX);
   const t1Color = 'rgba(130,255,160,0.9)';
   const t2Color = 'rgba(255,130,130,0.9)';
-  const team1Name = yourTeam === 0 ? 'Team 1 (You)' : 'Team 1';
-  const team2Name = yourTeam === 1 ? 'Team 2 (You)' : 'Team 2';
+  const team1Name = 'TEAM 1';
+  const team2Name = 'TEAM 2';
 
   // TOP ROW: Team 1 (left) | MARKS (center) | Team 2 (right)
   chalkBold(ctx, team1Name, 60, 70, 44, t1Color, 'left');

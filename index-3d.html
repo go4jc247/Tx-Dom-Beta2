@@ -2683,6 +2683,45 @@ function t42_setTrump(suit) {
   }
 }
 
+// Highlight trump tiles with emissive glow
+function t42_highlightTrumps() {
+  const hand = hands[PLAYER_IDX];
+  for (const t of hand) {
+    if (!t.mesh) continue;
+    const isTrump = t42_isTrump(t);
+    // Set emissive on face material
+    if (Array.isArray(t.mesh.material)) {
+      const faceMat = t.mesh.material[0];
+      if (faceMat) {
+        faceMat.emissive = isTrump ? new THREE.Color(0x443300) : new THREE.Color(0x000000);
+        faceMat.needsUpdate = true;
+      }
+    }
+  }
+}
+
+function t42_isTrump(tile) {
+  if (t42_trumpMode === 'DOUBLES') return tile.a === tile.b;
+  if (t42_trumpMode === 'PIP' && t42_trumpSuit !== null) {
+    return tile.a === t42_trumpSuit || tile.b === t42_trumpSuit;
+  }
+  return false;
+}
+
+function t42_clearHighlights() {
+  const hand = hands[PLAYER_IDX];
+  for (const t of hand) {
+    if (!t.mesh) continue;
+    if (Array.isArray(t.mesh.material)) {
+      const faceMat = t.mesh.material[0];
+      if (faceMat) {
+        faceMat.emissive = new THREE.Color(0x000000);
+        faceMat.needsUpdate = true;
+      }
+    }
+  }
+}
+
 // Preview sort: tap a tile during bidding to sort by that suit as trump
 function t42_previewSortByTile(tile) {
   const isDouble = tile.a === tile.b;
@@ -2724,6 +2763,7 @@ function t42_previewSortByTile(tile) {
   const label = t42_trumpMode === 'DOUBLES' ? 'Doubles' :
                 t42_trumpMode === 'PIP' ? t42_trumpSuit + 's' : 'unsorted';
   showToast('Preview: ' + label);
+  t42_highlightTrumps();
 }
 
 // Sort player's hand: trumps first (double trump highest), then non-trump doubles, then offs
@@ -2736,6 +2776,7 @@ function t42_sortHandByTrump() {
     return ka[1] - kb[1];
   });
   layoutPlayerHand(true, 0.4);
+  t42_highlightTrumps();
 }
 
 function t42_sortKey(tile) {

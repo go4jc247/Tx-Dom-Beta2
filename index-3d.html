@@ -2847,111 +2847,159 @@ function t42_sortKey(tile) {
   return [3, (100 - highPip) * 10 + (100 - lowPip)];
 }
 
-// =================== 3D SCOREBOARD ===================
-// Physical scoreboard object in the scene — sits across the table
+// =================== 3D SCOREBOARD (Chalkboard) ===================
 let scoreboardMesh = null;
 let scoreboardCtx = null;
 let scoreboardTex = null;
 
+// Adjustable scoreboard settings
+const SCOREBOARD = {
+  width: 1.8,         // world units wide
+  height: 1.0,        // world units tall
+  distance: 2.2,      // distance from table center (behind far player)
+  elevation: 0.9,     // height above table surface
+  tilt: -0.15         // lean angle (negative = tilt top toward player)
+};
+
 function createScoreboard() {
-  const W = 0.6, H = 0.3;
   const canvas = document.createElement('canvas');
-  canvas.width = 512; canvas.height = 256;
+  canvas.width = 1024; canvas.height = 576;
   scoreboardCtx = canvas.getContext('2d');
   scoreboardTex = new THREE.CanvasTexture(canvas);
   scoreboardTex.anisotropy = 8;
 
-  const geo = new THREE.PlaneGeometry(W, H);
+  const geo = new THREE.PlaneGeometry(SCOREBOARD.width, SCOREBOARD.height);
   const mat = new THREE.MeshStandardMaterial({
     map: scoreboardTex,
-    roughness: 0.3,
-    metalness: 0.05,
-    transparent: true
+    roughness: 0.85,
+    metalness: 0.0
   });
   scoreboardMesh = new THREE.Mesh(geo, mat);
-
-  // Position: far side of table, above felt, tilted toward player
-  scoreboardMesh.position.set(0, 0.25, -(R_TABLE * 0.7));
-  // Tilt to face player (rotate around X to lean back ~30°)
-  scoreboardMesh.rotation.x = -0.5;
-  // Face toward +Z (player)
-  scoreboardMesh.rotation.y = 0;
-
+  applyScoreboardPosition();
   scene.add(scoreboardMesh);
   updateScoreboard();
+}
+
+function applyScoreboardPosition() {
+  if (!scoreboardMesh) return;
+  scoreboardMesh.position.set(0, SCOREBOARD.elevation, -SCOREBOARD.distance);
+  scoreboardMesh.rotation.x = SCOREBOARD.tilt;
+}
+
+function drawTallyMarks(ctx, count, color, x, y, markH) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  const gap = 12;
+  for (let i = 0; i < count; i++) {
+    const groupPos = Math.floor(i / 5);
+    const inGroup = i % 5;
+    const bx = x + groupPos * (gap * 5 + 16) + inGroup * gap;
+    if (inGroup === 4) {
+      // Diagonal strike-through for 5th mark
+      ctx.beginPath();
+      ctx.moveTo(bx - gap * 3.5, y + markH);
+      ctx.lineTo(bx + gap * 0.5, y);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(bx, y);
+      ctx.lineTo(bx, y + markH);
+      ctx.stroke();
+    }
+  }
 }
 
 function updateScoreboard() {
   if (!scoreboardCtx) return;
   const ctx = scoreboardCtx;
-  const w = 512, h = 256;
+  const w = 1024, h = 576;
 
-  // Background: dark translucent panel
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(10, 12, 10, 0.85)';
-  ctx.beginPath();
-  const r = 20;
-  ctx.moveTo(r, 0); ctx.lineTo(w-r, 0); ctx.quadraticCurveTo(w, 0, w, r);
-  ctx.lineTo(w, h-r); ctx.quadraticCurveTo(w, h, w-r, h);
-  ctx.lineTo(r, h); ctx.quadraticCurveTo(0, h, 0, h-r);
-  ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
-  ctx.fill();
+  // Chalkboard background
+  ctx.fillStyle = '#1a2a1a';
+  ctx.fillRect(0, 0, w, h);
+  // Subtle chalk dust texture
+  for (let i = 0; i < 400; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.015})`;
+    ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+  }
+  // Wooden frame
+  ctx.strokeStyle = '#5a3a1a';
+  ctx.lineWidth = 16;
+  ctx.strokeRect(8, 8, w - 16, h - 16);
+  ctx.strokeStyle = '#3d2810';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(16, 16, w - 32, h - 32);
 
-  // Border
-  ctx.strokeStyle = 'rgba(240, 209, 137, 0.4)';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // Title
-  ctx.fillStyle = '#f0d189';
-  ctx.font = 'bold 28px -apple-system, sans-serif';
+  // Title: Hand number
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 38px -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Hand ' + roundNumber, w/2, 38);
+  ctx.fillText('HAND ' + roundNumber, w / 2, 60);
 
-  // Bid info
+  // Bid info line
   if (t42_bidWinner >= 0 && t42_bidAmount > 0) {
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '20px -apple-system, sans-serif';
+    ctx.fillStyle = '#f0d189';
+    ctx.font = '26px -apple-system, sans-serif';
     const bidder = t42_bidWinner === PLAYER_IDX ? 'You' : 'P' + (t42_bidWinner + 1);
     const trumpLabel = t42_trumpMode === 'DOUBLES' ? 'Doubles' :
                        t42_trumpSuit !== null ? t42_trumpSuit + 's' : '—';
-    ctx.fillText(bidder + ' bid ' + t42_bidAmount + ' · Trump: ' + trumpLabel, w/2, 65);
+    ctx.fillText(bidder + ' bid ' + t42_bidAmount + '  ·  Trump: ' + trumpLabel, w / 2, 95);
   }
 
-  // Team scores
+  // Divider line
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(50, 115); ctx.lineTo(w - 50, 115); ctx.stroke();
+
+  // Team sections
   const yourTeam = t42_teamOf(PLAYER_IDX);
-  const y0 = 105;
+  const teamStartY = 145;
+
   for (let team = 0; team < 2; team++) {
     const isYou = team === yourTeam;
+    const ty = teamStartY + team * 210;
     const name = isYou ? 'YOUR TEAM' : 'OPPONENTS';
     const pts = scores[team] || 0;
     const marks = t42_teamMarks[team] || 0;
-    const ty = y0 + team * 70;
+    const teamColor = isYou ? '#4ade80' : '#f87171';
 
     // Team name
-    ctx.fillStyle = isYou ? '#22c55e' : '#ef4444';
-    ctx.font = 'bold 22px -apple-system, sans-serif';
+    ctx.fillStyle = teamColor;
+    ctx.font = 'bold 32px -apple-system, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(name, 30, ty);
+    ctx.fillText(name, 50, ty);
 
-    // Points this hand
-    ctx.fillStyle = '#f5f5f5';
-    ctx.font = 'bold 36px -apple-system, sans-serif';
+    // Points (large)
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 64px -apple-system, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(pts + ' pts', w - 30, ty);
+    ctx.fillText(pts, w - 60, ty + 5);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '24px -apple-system, sans-serif';
+    ctx.fillText('pts', w - 60, ty + 30);
 
-    // Marks
-    ctx.fillStyle = '#f0d189';
-    ctx.font = '18px -apple-system, sans-serif';
+    // Progress bar
+    const barX = 50, barY = ty + 45, barW = w - 100, barH = 16;
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(barX, barY, barW, barH);
+    const fillPct = Math.min(1, pts / 42);
+    ctx.fillStyle = teamColor;
+    ctx.fillRect(barX, barY, barW * fillPct, barH);
+
+    // Marks as tally marks
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '20px -apple-system, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(marks + ' marks', 30, ty + 25);
+    ctx.fillText('Marks:', 50, ty + 90);
+    drawTallyMarks(ctx, marks, teamColor, 160, ty + 72, 22);
   }
 
-  // Target
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
-  ctx.font = '16px -apple-system, sans-serif';
+  // Target info at bottom
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '20px -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('First to ' + t42_marksToWin + ' marks', w/2, h - 12);
+  ctx.fillText('First to ' + t42_marksToWin + ' marks wins', w / 2, h - 30);
 
   scoreboardTex.needsUpdate = true;
 }

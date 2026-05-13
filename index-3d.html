@@ -2538,6 +2538,196 @@ let t42_contract = 'NORMAL';     // 'NORMAL' or 'NELLO'
 // T42 teams: even seats (0,2) = team 0, odd seats (1,3) = team 1
 function t42_teamOf(p) { return p % 2; }
 
+// =================== T42 BIDDING PHASE (headless — no logic) ===================
+let t42_bidCurrent = 0;  // whose turn to bid
+let t42_highBid = 0;
+let t42_highBidder = -1;
+let t42_passCount = 0;
+
+function t42_startBidPhase() {
+  t42_bidCurrent = (t42_dealer + 1) % PLAYER_COUNT;
+  t42_highBid = 0;
+  t42_highBidder = -1;
+  t42_passCount = 0;
+  showToast(`Bidding · P${t42_bidCurrent + 1}'s turn`);
+
+  if (t42_bidCurrent === PLAYER_IDX) {
+    t42_showBidUI();
+  } else {
+    // CPU auto-bids (headless: random pass or 30)
+    setTimeout(() => t42_cpuBid(t42_bidCurrent), 800);
+  }
+}
+
+function t42_cpuBid(seat) {
+  // Headless: CPU randomly passes or bids 30
+  const willBid = Math.random() > 0.6;
+  if (willBid && t42_highBid < 30) {
+    t42_highBid = 30;
+    t42_highBidder = seat;
+    showToast(`P${seat + 1} bids 30`);
+  } else {
+    t42_passCount++;
+    showToast(`P${seat + 1} passes`);
+  }
+  setTimeout(() => t42_advanceBid(), 600);
+}
+
+function t42_advanceBid() {
+  // Check if bidding is over: 3 passes after a bid, or all 4 passed
+  if (t42_highBidder >= 0 && t42_passCount >= 3) {
+    // Bid winner found
+    t42_bidWinner = t42_highBidder;
+    t42_bidAmount = t42_highBid;
+    showToast(`P${t42_bidWinner + 1} wins bid at ${t42_bidAmount}`);
+    setTimeout(() => t42_startTrumpPhase(), 800);
+    return;
+  }
+  if (t42_passCount >= 4) {
+    // All passed — force dealer to bid 30
+    t42_bidWinner = t42_dealer;
+    t42_bidAmount = 30;
+    t42_highBid = 30;
+    showToast(`All pass — P${t42_dealer + 1} forced to bid 30`);
+    setTimeout(() => t42_startTrumpPhase(), 800);
+    return;
+  }
+
+  // Next bidder
+  t42_bidCurrent = (t42_bidCurrent + 1) % PLAYER_COUNT;
+  if (t42_bidCurrent === PLAYER_IDX) {
+    t42_showBidUI();
+  } else {
+    setTimeout(() => t42_cpuBid(t42_bidCurrent), 800);
+  }
+}
+
+function t42_showBidUI() {
+  const minBid = Math.max(30, t42_highBid + 1);
+  showMessage(
+    '<div style="text-align:center;padding:10px">' +
+    '<div style="font-size:14px;margin-bottom:10px;color:#f0d189">Your Bid</div>' +
+    '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
+    '<button onclick="t42_playerBid(0)" style="padding:10px 18px;border-radius:8px;border:none;background:#64748b;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Pass</button>' +
+    '<button onclick="t42_playerBid(30)" style="padding:10px 18px;border-radius:8px;border:none;background:#22c55e;color:#fff;font-size:14px;font-weight:600;cursor:pointer">' + (minBid <= 30 ? '30' : minBid) + '</button>' +
+    '<button onclick="t42_playerBid(31)" style="padding:10px 18px;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-size:14px;font-weight:600;cursor:pointer">31</button>' +
+    '<button onclick="t42_playerBid(32)" style="padding:10px 18px;border-radius:8px;border:none;background:#6366f1;color:#fff;font-size:14px;font-weight:600;cursor:pointer">32</button>' +
+    '<button onclick="t42_playerBid(36)" style="padding:10px 18px;border-radius:8px;border:none;background:#8b5cf6;color:#fff;font-size:14px;font-weight:600;cursor:pointer">36</button>' +
+    '<button onclick="t42_playerBid(42)" style="padding:10px 18px;border-radius:8px;border:none;background:#eab308;color:#000;font-size:14px;font-weight:600;cursor:pointer">42</button>' +
+    '</div></div>'
+  );
+}
+
+function t42_playerBid(amount) {
+  hideMessage();
+  if (amount === 0) {
+    t42_passCount++;
+    showToast('You pass');
+  } else {
+    t42_highBid = amount;
+    t42_highBidder = PLAYER_IDX;
+    t42_passCount = 0; // reset pass count when new bid
+    showToast('You bid ' + amount);
+  }
+  setTimeout(() => t42_advanceBid(), 500);
+}
+
+// =================== T42 TRUMP PICKING PHASE ===================
+function t42_startTrumpPhase() {
+  if (t42_bidWinner === PLAYER_IDX) {
+    t42_showTrumpUI();
+  } else {
+    // CPU picks trump (headless: random suit)
+    const suits = [0, 1, 2, 3, 4, 5, 6, 'DOUBLES'];
+    const pick = suits[Math.floor(Math.random() * suits.length)];
+    t42_setTrump(pick);
+    showToast(`P${t42_bidWinner + 1} calls ${pick === 'DOUBLES' ? 'Doubles' : pick + 's'} trump`);
+    setTimeout(() => t42_startPlay(), 800);
+  }
+}
+
+function t42_showTrumpUI() {
+  showMessage(
+    '<div style="text-align:center;padding:10px">' +
+    '<div style="font-size:14px;margin-bottom:10px;color:#f0d189">Pick Trump</div>' +
+    '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">' +
+    '<button onclick="t42_playerPickTrump(0)" style="padding:10px 16px;border-radius:8px;border:none;background:#333;color:#fff;font-size:14px;cursor:pointer">Blanks</button>' +
+    '<button onclick="t42_playerPickTrump(1)" style="padding:10px 16px;border-radius:8px;border:none;background:#36B258;color:#fff;font-size:14px;cursor:pointer">1s</button>' +
+    '<button onclick="t42_playerPickTrump(2)" style="padding:10px 16px;border-radius:8px;border:none;background:#F0C73D;color:#000;font-size:14px;cursor:pointer">2s</button>' +
+    '<button onclick="t42_playerPickTrump(3)" style="padding:10px 16px;border-radius:8px;border:none;background:#E74C3C;color:#fff;font-size:14px;cursor:pointer">3s</button>' +
+    '<button onclick="t42_playerPickTrump(4)" style="padding:10px 16px;border-radius:8px;border:none;background:#00B2FF;color:#fff;font-size:14px;cursor:pointer">4s</button>' +
+    '<button onclick="t42_playerPickTrump(5)" style="padding:10px 16px;border-radius:8px;border:none;background:#9B59B6;color:#fff;font-size:14px;cursor:pointer">5s</button>' +
+    '<button onclick="t42_playerPickTrump(6)" style="padding:10px 16px;border-radius:8px;border:none;background:#A76E34;color:#fff;font-size:14px;cursor:pointer">6s</button>' +
+    '<button onclick="t42_playerPickTrump(\'DOUBLES\')" style="padding:10px 16px;border-radius:8px;border:none;background:#eab308;color:#000;font-size:14px;cursor:pointer">Doubles</button>' +
+    '</div></div>'
+  );
+}
+
+function t42_playerPickTrump(suit) {
+  hideMessage();
+  t42_setTrump(suit);
+  const label = suit === 'DOUBLES' ? 'Doubles' : suit + 's';
+  showToast('Trump: ' + label);
+  // Sort hand by trump
+  t42_sortHandByTrump();
+  setTimeout(() => t42_startPlay(), 800);
+}
+
+function t42_setTrump(suit) {
+  if (suit === 'DOUBLES') {
+    t42_trumpSuit = null;
+    t42_trumpMode = 'DOUBLES';
+  } else {
+    t42_trumpSuit = suit;
+    t42_trumpMode = 'PIP';
+  }
+}
+
+// Sort player's hand: trumps first (double trump highest), then non-trump doubles, then offs
+function t42_sortHandByTrump() {
+  const hand = hands[PLAYER_IDX];
+  hand.sort((a, b) => {
+    const ka = t42_sortKey(a);
+    const kb = t42_sortKey(b);
+    if (ka[0] !== kb[0]) return ka[0] - kb[0];
+    return ka[1] - kb[1];
+  });
+  layoutPlayerHand(true, 0.4);
+}
+
+function t42_sortKey(tile) {
+  const isDouble = tile.a === tile.b;
+  let isTrump = false, isDoubleTrump = false;
+
+  if (t42_trumpMode === 'DOUBLES') {
+    if (isDouble) { isTrump = true; isDoubleTrump = true; }
+  } else if (t42_trumpSuit !== null) {
+    if (tile.a === t42_trumpSuit || tile.b === t42_trumpSuit) {
+      isTrump = true;
+      isDoubleTrump = isDouble;
+    }
+  }
+
+  const highPip = Math.max(tile.a, tile.b);
+  const lowPip = Math.min(tile.a, tile.b);
+  const otherPip = (tile.a === t42_trumpSuit) ? tile.b : tile.a;
+
+  if (isDoubleTrump) return [0, 100 - highPip];
+  if (isTrump) return [1, 100 - otherPip];
+  if (isDouble) return [2, 100 - highPip];
+  return [3, (100 - highPip) * 10 + (100 - lowPip)];
+}
+
+// Start play phase after trump is chosen
+function t42_startPlay() {
+  t42_leader = t42_bidWinner;
+  turn = t42_leader;
+  phase = 'playing';
+  updateUI();
+  showToast(`P${t42_leader + 1} leads`);
+  beginTurn();
+}
+
 // Trick-center positions mimicking TX-Dom's T42 layout:
 //   Lead tile:    dead center of the table
 //   Player 0 (you): just below center (toward you)
@@ -4181,26 +4371,17 @@ function startNewRoundDeal() {
     }
   }
 
-  // ── T42 mode: skip chain opener, go straight to bidding (stubbed → leader plays first) ──
+  // ── T42 mode: bid phase → trump pick → play ──
   if (gameMode === GAME_MODES.TEXAS_42) {
     t42_resetHand();
-    // For now, stub bidding: rotate dealer, player left of dealer leads.
     t42_dealer = (t42_dealer + 1) % PLAYER_COUNT;
-    t42_leader = (t42_dealer + 1) % PLAYER_COUNT;
-    t42_bidWinner = t42_leader;
-    t42_bidAmount = 30;
-    t42_trumpSuit = null;
-    t42_trumpMode = 'NONE';
-    t42_contract = 'NORMAL';
-    turn = t42_leader;
-    phase = 'animating';
+    phase = 'bidding';
     updateUI();
-    showToast(`Hand ${roundNumber} · P${t42_leader + 1} leads`);
+
+    // Wait for deal animation to finish, then start bid phase
     setTimeout(() => {
-      phase = 'playing';
-      updateUI();
-      beginTurn();
-    }, 1300);
+      t42_startBidPhase();
+    }, 1200);
     return;
   }
 

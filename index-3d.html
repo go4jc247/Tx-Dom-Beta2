@@ -2683,18 +2683,25 @@ function t42_setTrump(suit) {
   }
 }
 
-// Highlight trump tiles with emissive glow
+// Highlight trump tiles: bright white face. Non-trump: normal ivory.
 function t42_highlightTrumps() {
   const hand = hands[PLAYER_IDX];
   for (const t of hand) {
     if (!t.mesh) continue;
     const isTrump = t42_isTrump(t);
-    // Set emissive on face material
     if (Array.isArray(t.mesh.material)) {
+      // Face material (material[0]): white for trump, ivory for non-trump
       const faceMat = t.mesh.material[0];
       if (faceMat) {
-        faceMat.emissive = isTrump ? new THREE.Color(0x443300) : new THREE.Color(0x000000);
+        faceMat.color = isTrump ? new THREE.Color(0xffffff) : new THREE.Color(0xddd8c8);
+        faceMat.emissive = new THREE.Color(0x000000);
         faceMat.needsUpdate = true;
+      }
+      // Side material: also brighten for trump
+      const sideMat = t.mesh.material[1];
+      if (sideMat && sideMat !== sharedTileSideMat) {
+        sideMat.color = isTrump ? new THREE.Color(0xffffff) : new THREE.Color(tileStyle.side);
+        sideMat.needsUpdate = true;
       }
     }
   }
@@ -2715,6 +2722,7 @@ function t42_clearHighlights() {
     if (Array.isArray(t.mesh.material)) {
       const faceMat = t.mesh.material[0];
       if (faceMat) {
+        faceMat.color = new THREE.Color(0xddd8c8);
         faceMat.emissive = new THREE.Color(0x000000);
         faceMat.needsUpdate = true;
       }

@@ -606,6 +606,42 @@
   <button class="btn hidden" id="newGameBtn">New Game</button>
   <div id="toast"></div>
   <div id="scorePanel" class="hidden"></div>
+
+  <!-- Chalkboard edit button -->
+  <button id="chalkEditBtn" onclick="toggleChalkEditor()" style="position:fixed;top:12px;right:60px;z-index:20;pointer-events:auto;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:6px 10px;color:#f0d189;font-size:16px;cursor:pointer;display:none;">✏️</button>
+
+  <!-- Chalkboard slider panel -->
+  <div id="chalkEditorPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:30;pointer-events:auto;padding:12px 16px 20px;background:transparent;">
+    <div style="max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:#f0d189;font-size:12px;width:70px;">Width</span>
+        <input type="range" id="cbWidth" min="0.5" max="3.5" step="0.05" value="1.8" oninput="updateChalkSetting('width',this.value)" style="flex:1">
+        <span id="cbWidthVal" style="color:#fff;font-size:11px;width:35px;">1.8</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:#f0d189;font-size:12px;width:70px;">Height</span>
+        <input type="range" id="cbHeight" min="0.3" max="2.0" step="0.05" value="1.0" oninput="updateChalkSetting('height',this.value)" style="flex:1">
+        <span id="cbHeightVal" style="color:#fff;font-size:11px;width:35px;">1.0</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:#f0d189;font-size:12px;width:70px;">Distance</span>
+        <input type="range" id="cbDistance" min="1.0" max="5.0" step="0.1" value="2.2" oninput="updateChalkSetting('distance',this.value)" style="flex:1">
+        <span id="cbDistanceVal" style="color:#fff;font-size:11px;width:35px;">2.2</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:#f0d189;font-size:12px;width:70px;">Elevation</span>
+        <input type="range" id="cbElevation" min="0.1" max="2.5" step="0.05" value="0.9" oninput="updateChalkSetting('elevation',this.value)" style="flex:1">
+        <span id="cbElevationVal" style="color:#fff;font-size:11px;width:35px;">0.9</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:#f0d189;font-size:12px;width:70px;">Tilt</span>
+        <input type="range" id="cbTilt" min="-1.0" max="1.0" step="0.05" value="-0.15" oninput="updateChalkSetting('tilt',this.value)" style="flex:1">
+        <span id="cbTiltVal" style="color:#fff;font-size:11px;width:35px;">-0.15</span>
+      </div>
+      <button onclick="toggleChalkEditor()" style="align-self:center;margin-top:4px;padding:6px 16px;border-radius:6px;border:none;background:#64748b;color:#fff;font-size:12px;cursor:pointer;">Done</button>
+    </div>
+  </div>
+
   <div id="settingsBackdrop"></div>
   <button id="musicBtn" title="Music" aria-label="Toggle music">♪</button>
   <button id="richModeBtn" title="Rich color mode" aria-label="Toggle rich color mode">✨</button>
@@ -3004,6 +3040,31 @@ function updateScoreboard() {
   scoreboardTex.needsUpdate = true;
 }
 
+// Chalkboard editor toggle
+function toggleChalkEditor() {
+  const panel = document.getElementById('chalkEditorPanel');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+}
+
+function updateChalkSetting(key, val) {
+  val = parseFloat(val);
+  SCOREBOARD[key] = val;
+  document.getElementById('cb' + key.charAt(0).toUpperCase() + key.slice(1) + 'Val').textContent = val.toFixed(2);
+  // Rebuild geometry for width/height changes
+  if (key === 'width' || key === 'height') {
+    const geo = new THREE.PlaneGeometry(SCOREBOARD.width, SCOREBOARD.height);
+    scoreboardMesh.geometry.dispose();
+    scoreboardMesh.geometry = geo;
+  }
+  applyScoreboardPosition();
+}
+
+// Show edit button once scoreboard exists
+function showChalkEditBtn() {
+  document.getElementById('chalkEditBtn').style.display = 'block';
+}
+
 // Start play phase after trump is chosen
 function t42_startPlay() {
   t42_leader = t42_bidWinner;
@@ -4525,7 +4586,7 @@ function newMatch() {
     scores = [0, 0];
     t42_teamMarks = [0, 0];
     t42_dealer = 0;
-    if (!scoreboardMesh) createScoreboard();
+    if (!scoreboardMesh) { createScoreboard(); showChalkEditBtn(); }
   } else {
     scores = new Array(PLAYER_COUNT).fill(0);
   }

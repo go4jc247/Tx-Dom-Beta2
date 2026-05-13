@@ -2697,15 +2697,24 @@ function t42_highlightTrumps() {
     if (faceMat.map) faceMat.map.dispose();
 
     if (isTrump) {
-      // Rebuild with bright white background
+      // Rebuild with pure white background
       faceMat.map = makePipTextureHighlighted(t.a, t.b);
+      faceMat.color = new THREE.Color(0xffffff);
+      faceMat.emissive = new THREE.Color(0x000000);
+      faceMat.needsUpdate = true;
+      // Clone side material to white for trump tiles
+      const whiteSide = sharedTileSideMat.clone();
+      whiteSide.color = new THREE.Color(0xffffff);
+      t.mesh.material = [faceMat, whiteSide, whiteSide];
     } else {
       // Normal ivory texture
       faceMat.map = makePipTexture(t.a, t.b);
+      faceMat.color = new THREE.Color(0xffffff);
+      faceMat.emissive = new THREE.Color(0x000000);
+      faceMat.needsUpdate = true;
+      // Restore shared side material
+      t.mesh.material = [faceMat, sharedTileSideMat, sharedTileSideMat];
     }
-    faceMat.color = new THREE.Color(0xffffff);
-    faceMat.emissive = new THREE.Color(0x000000);
-    faceMat.needsUpdate = true;
   }
 }
 
@@ -2714,16 +2723,11 @@ function makePipTextureHighlighted(a, b) {
   const c = document.createElement('canvas');
   c.width = 512; c.height = 256;
   const ctx = c.getContext('2d');
-  // Bright white gradient instead of ivory
+  // Pure white — both top and bottom
   const bg = ctx.createLinearGradient(0, 0, 0, 256);
   bg.addColorStop(0, '#ffffff');
-  bg.addColorStop(1, '#f0f0f0');
+  bg.addColorStop(1, '#ffffff');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, 512, 256);
-  // Subtle texture noise (lighter)
-  for (let i = 0; i < 300; i++) {
-    ctx.fillStyle = `rgba(200,200,210,${Math.random()*0.03})`;
-    ctx.fillRect(Math.random()*512, Math.random()*256, 1.5, 1.5);
-  }
   // Divider
   ctx.lineWidth = tileStyle.dividerWidth;
   ctx.lineCap = 'round';

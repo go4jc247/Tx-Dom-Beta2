@@ -1481,7 +1481,6 @@ function buildInitialRacks() {
   }
 }
 buildInitialRacks();
-if (gameMode === GAME_MODES.TEXAS_42) createScoreboard();
 
 // Rebuild all racks (e.g. after the tilt slider changes or PLAYER_COUNT
 // changed). Replaces the existing rack groups and updates references.
@@ -4475,6 +4474,7 @@ function newMatch() {
     scores = [0, 0];
     t42_teamMarks = [0, 0];
     t42_dealer = 0;
+    if (!scoreboardMesh) createScoreboard();
   } else {
     scores = new Array(PLAYER_COUNT).fill(0);
   }

@@ -2964,9 +2964,8 @@ function drawTallyMarks(ctx, count, color, x, y, markH) {
 function chalkBold(ctx, text, x, y, size, color, align) {
   ctx.save();
   ctx.textAlign = align || 'left';
-  ctx.font = size + 'px "ChalkBold", "Marker Felt", cursive';
-  ctx.fillStyle = color || 'rgba(255,255,255,0.9)';
-  ctx.globalAlpha = 0.92;
+  ctx.font = size + 'px "ChalkBold", cursive';
+  ctx.fillStyle = color || '#ffffff';
   ctx.fillText(text, x, y);
   ctx.restore();
 }
@@ -2975,9 +2974,8 @@ function chalkBold(ctx, text, x, y, size, color, align) {
 function chalkText(ctx, text, x, y, size, color, align) {
   ctx.save();
   ctx.textAlign = align || 'left';
-  ctx.font = size + 'px "ChalkFont", "Marker Felt", cursive';
-  ctx.fillStyle = color || 'rgba(255,255,255,0.85)';
-  ctx.globalAlpha = 0.9;
+  ctx.font = size + 'px "ChalkFont", cursive';
+  ctx.fillStyle = color || '#ffffff';
   ctx.fillText(text, x, y);
   ctx.restore();
 }

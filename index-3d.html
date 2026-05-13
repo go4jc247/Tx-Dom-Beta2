@@ -1481,6 +1481,7 @@ function buildInitialRacks() {
   }
 }
 buildInitialRacks();
+if (gameMode === GAME_MODES.TEXAS_42) createScoreboard();
 
 // Rebuild all racks (e.g. after the tilt slider changes or PLAYER_COUNT
 // changed). Replaces the existing rack groups and updates references.
@@ -2844,6 +2845,115 @@ function t42_sortKey(tile) {
   return [3, (100 - highPip) * 10 + (100 - lowPip)];
 }
 
+// =================== 3D SCOREBOARD ===================
+// Physical scoreboard object in the scene — sits across the table
+let scoreboardMesh = null;
+let scoreboardCtx = null;
+let scoreboardTex = null;
+
+function createScoreboard() {
+  const W = 0.6, H = 0.3;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 256;
+  scoreboardCtx = canvas.getContext('2d');
+  scoreboardTex = new THREE.CanvasTexture(canvas);
+  scoreboardTex.anisotropy = 8;
+
+  const geo = new THREE.PlaneGeometry(W, H);
+  const mat = new THREE.MeshStandardMaterial({
+    map: scoreboardTex,
+    roughness: 0.3,
+    metalness: 0.05,
+    transparent: true
+  });
+  scoreboardMesh = new THREE.Mesh(geo, mat);
+
+  // Position: far side of table, above felt, tilted toward player
+  scoreboardMesh.position.set(0, 0.25, -(R_TABLE * 0.7));
+  // Tilt to face player (rotate around X to lean back ~30°)
+  scoreboardMesh.rotation.x = -0.5;
+  // Face toward +Z (player)
+  scoreboardMesh.rotation.y = 0;
+
+  scene.add(scoreboardMesh);
+  updateScoreboard();
+}
+
+function updateScoreboard() {
+  if (!scoreboardCtx) return;
+  const ctx = scoreboardCtx;
+  const w = 512, h = 256;
+
+  // Background: dark translucent panel
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(10, 12, 10, 0.85)';
+  ctx.beginPath();
+  const r = 20;
+  ctx.moveTo(r, 0); ctx.lineTo(w-r, 0); ctx.quadraticCurveTo(w, 0, w, r);
+  ctx.lineTo(w, h-r); ctx.quadraticCurveTo(w, h, w-r, h);
+  ctx.lineTo(r, h); ctx.quadraticCurveTo(0, h, 0, h-r);
+  ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = 'rgba(240, 209, 137, 0.4)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Title
+  ctx.fillStyle = '#f0d189';
+  ctx.font = 'bold 28px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Hand ' + roundNumber, w/2, 38);
+
+  // Bid info
+  if (t42_bidWinner >= 0 && t42_bidAmount > 0) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '20px -apple-system, sans-serif';
+    const bidder = t42_bidWinner === PLAYER_IDX ? 'You' : 'P' + (t42_bidWinner + 1);
+    const trumpLabel = t42_trumpMode === 'DOUBLES' ? 'Doubles' :
+                       t42_trumpSuit !== null ? t42_trumpSuit + 's' : '—';
+    ctx.fillText(bidder + ' bid ' + t42_bidAmount + ' · Trump: ' + trumpLabel, w/2, 65);
+  }
+
+  // Team scores
+  const yourTeam = t42_teamOf(PLAYER_IDX);
+  const y0 = 105;
+  for (let team = 0; team < 2; team++) {
+    const isYou = team === yourTeam;
+    const name = isYou ? 'YOUR TEAM' : 'OPPONENTS';
+    const pts = scores[team] || 0;
+    const marks = t42_teamMarks[team] || 0;
+    const ty = y0 + team * 70;
+
+    // Team name
+    ctx.fillStyle = isYou ? '#22c55e' : '#ef4444';
+    ctx.font = 'bold 22px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(name, 30, ty);
+
+    // Points this hand
+    ctx.fillStyle = '#f5f5f5';
+    ctx.font = 'bold 36px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(pts + ' pts', w - 30, ty);
+
+    // Marks
+    ctx.fillStyle = '#f0d189';
+    ctx.font = '18px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(marks + ' marks', 30, ty + 25);
+  }
+
+  // Target
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+  ctx.font = '16px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('First to ' + t42_marksToWin + ' marks', w/2, h - 12);
+
+  scoreboardTex.needsUpdate = true;
+}
+
 // Start play phase after trump is chosen
 function t42_startPlay() {
   t42_leader = t42_bidWinner;
@@ -3316,6 +3426,7 @@ function roundToNearest5(n) {
 
 const scorePanelEl = document.getElementById('scorePanel');
 function updateScorePanel() {
+  if (typeof updateScoreboard === 'function') updateScoreboard();
   if (!scorePanelEl) return;
 
   // T42: show team scores + marks

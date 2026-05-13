@@ -2683,6 +2683,49 @@ function t42_setTrump(suit) {
   }
 }
 
+// Preview sort: tap a tile during bidding to sort by that suit as trump
+function t42_previewSortByTile(tile) {
+  const isDouble = tile.a === tile.b;
+  if (isDouble) {
+    // Tapping a double: cycle between that pip suit and DOUBLES mode
+    if (t42_trumpMode === 'DOUBLES') {
+      t42_trumpSuit = tile.a;
+      t42_trumpMode = 'PIP';
+    } else if (t42_trumpSuit === tile.a) {
+      t42_trumpSuit = null;
+      t42_trumpMode = 'DOUBLES';
+    } else {
+      t42_trumpSuit = tile.a;
+      t42_trumpMode = 'PIP';
+    }
+  } else {
+    // Non-double: use higher pip as trump (tap again for lower, again for null)
+    const high = Math.max(tile.a, tile.b);
+    const low = Math.min(tile.a, tile.b);
+    if (t42_trumpSuit === high && t42_trumpMode === 'PIP') {
+      t42_trumpSuit = low;
+    } else if (t42_trumpSuit === low && t42_trumpMode === 'PIP') {
+      t42_trumpSuit = null;
+      t42_trumpMode = 'NONE';
+    } else {
+      t42_trumpSuit = high;
+      t42_trumpMode = 'PIP';
+    }
+  }
+  // Sort and re-layout
+  const hand = hands[PLAYER_IDX];
+  hand.sort((a, b) => {
+    const ka = t42_sortKey(a);
+    const kb = t42_sortKey(b);
+    if (ka[0] !== kb[0]) return ka[0] - kb[0];
+    return ka[1] - kb[1];
+  });
+  layoutPlayerHand(true, 0.3);
+  const label = t42_trumpMode === 'DOUBLES' ? 'Doubles' :
+                t42_trumpMode === 'PIP' ? t42_trumpSuit + 's' : 'unsorted';
+  showToast('Preview: ' + label);
+}
+
 // Sort player's hand: trumps first (double trump highest), then non-trump doubles, then offs
 function t42_sortHandByTrump() {
   const hand = hands[PLAYER_IDX];
@@ -4696,6 +4739,11 @@ canvas.addEventListener('pointerup', (e) => {
   }
   const tile = pickPlayerTile(e.clientX, e.clientY);
   if (tile) {
+    // During bidding: tap tile to preview-sort by that suit as trump
+    if (phase === 'bidding') {
+      t42_previewSortByTile(tile);
+      return;
+    }
     if (phase === 'awaitingSide' && pendingTile === tile) {
       cancelSelection();
     } else {

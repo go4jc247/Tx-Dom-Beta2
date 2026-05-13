@@ -943,6 +943,14 @@ const TILE_SKINS = [
 const tileStyle = Object.assign({}, TILE_SKINS[0]);
 let currentSkinIdx = 0;
 
+// =================== Game Mode (must be early for rack building) ===================
+const GAME_MODES = {
+  ALL_FIVES: 'allfives',
+  BLOCK:     'block',
+  TEXAS_42:  'texas42'
+};
+let gameMode = GAME_MODES.TEXAS_42;
+
 // =================== Constants ===================
 const TILE_LONG  = 0.14;
 const TILE_SHORT = 0.07;
@@ -2503,13 +2511,8 @@ let pendingTile = null;
 let pendingValidBranches = [];
 let boardOffset = { x: 0, z: 0 };
 
-// =================== Game mode + scoring ===================
-const GAME_MODES = {
-  ALL_FIVES: 'allfives',
-  BLOCK:     'block',
-  TEXAS_42:  'texas42'
-};
-let gameMode = GAME_MODES.TEXAS_42;
+// =================== Scoring ===================
+// (GAME_MODES and gameMode declared earlier at top of constants section)
 // Cumulative scores per player across the whole match.
 let scores = new Array(PLAYER_COUNT).fill(0);
 // Score needed to win the match. Default 150, customizable in settings.

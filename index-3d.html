@@ -2943,6 +2943,13 @@ function createScoreboard() {
     'padding:20px;font-family:ChalkFont,cursive;overflow:hidden;';
   document.body.appendChild(sb);
   scoreboardMesh = sb;
+  // Tap or hover brings scoreboard to front, leave/tap-away sends it back
+  sb.addEventListener('mouseenter', function() { sb.style.zIndex = '50'; });
+  sb.addEventListener('mouseleave', function() { sb.style.zIndex = '0'; });
+  sb.addEventListener('touchstart', function(e) {
+    if (sb.style.zIndex === '50') { sb.style.zIndex = '0'; }
+    else { sb.style.zIndex = '50'; }
+  }, {passive: true});
   updateScoreboard();
 }
 

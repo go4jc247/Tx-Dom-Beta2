@@ -613,26 +613,26 @@
   <button id="chalkEditBtn" onclick="toggleChalkEditor()" style="position:fixed;top:12px;right:60px;z-index:20;pointer-events:auto;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:6px 10px;color:#f0d189;font-size:16px;cursor:pointer;display:none;">✏️</button>
 
   <!-- Chalkboard slider panel -->
-  <div id="chalkEditorPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:30;pointer-events:auto;padding:12px 16px 20px;background:transparent;">
+  <div id="chalkEditorPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:30;pointer-events:auto;touch-action:auto;padding:12px 16px 20px;background:rgba(0,0,0,0.7);border-top:1px solid rgba(255,255,255,0.1);">
     <div style="max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:8px;">
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Top</span>
-        <input type="range" id="cbTop" min="0" max="80" step="1" value="5" oninput="updateChalkSetting('top',this.value)" style="flex:1">
+        <input type="range" id="cbTop" min="0" max="80" step="1" value="5" oninput="updateChalkSetting('top',this.value)" style="flex:1;touch-action:auto">
         <span id="cbTopVal" style="color:#fff;font-size:11px;width:35px;">5%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Left</span>
-        <input type="range" id="cbLeft" min="0" max="80" step="1" value="15" oninput="updateChalkSetting('left',this.value)" style="flex:1">
+        <input type="range" id="cbLeft" min="0" max="80" step="1" value="15" oninput="updateChalkSetting('left',this.value)" style="flex:1;touch-action:auto">
         <span id="cbLeftVal" style="color:#fff;font-size:11px;width:35px;">15%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Width</span>
-        <input type="range" id="cbWidth" min="10" max="100" step="1" value="70" oninput="updateChalkSetting('width',this.value)" style="flex:1">
+        <input type="range" id="cbWidth" min="10" max="100" step="1" value="70" oninput="updateChalkSetting('width',this.value)" style="flex:1;touch-action:auto">
         <span id="cbWidthVal" style="color:#fff;font-size:11px;width:35px;">70%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Height</span>
-        <input type="range" id="cbHeight" min="10" max="100" step="1" value="45" oninput="updateChalkSetting('height',this.value)" style="flex:1">
+        <input type="range" id="cbHeight" min="10" max="100" step="1" value="45" oninput="updateChalkSetting('height',this.value)" style="flex:1;touch-action:auto">
         <span id="cbHeightVal" style="color:#fff;font-size:11px;width:35px;">45%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">

@@ -616,29 +616,44 @@
   <div id="chalkEditorPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:30;pointer-events:auto;padding:12px 16px 20px;background:transparent;">
     <div style="max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:8px;">
       <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:#f0d189;font-size:12px;width:70px;">Top</span>
+        <input type="range" id="cbTop" min="0" max="60" step="1" value="5" oninput="updateChalkSetting('top',this.value)" style="flex:1">
+        <span id="cbTopVal" style="color:#fff;font-size:11px;width:35px;">5%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:#f0d189;font-size:12px;width:70px;">Left</span>
+        <input type="range" id="cbLeft" min="0" max="50" step="1" value="15" oninput="updateChalkSetting('left',this.value)" style="flex:1">
+        <span id="cbLeftVal" style="color:#fff;font-size:11px;width:35px;">15%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Width</span>
-        <input type="range" id="cbWidth" min="0.5" max="3.5" step="0.05" value="1.8" oninput="updateChalkSetting('width',this.value)" style="flex:1">
-        <span id="cbWidthVal" style="color:#fff;font-size:11px;width:35px;">1.8</span>
+        <input type="range" id="cbWidth" min="20" max="100" step="1" value="70" oninput="updateChalkSetting('width',this.value)" style="flex:1">
+        <span id="cbWidthVal" style="color:#fff;font-size:11px;width:35px;">70%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Height</span>
-        <input type="range" id="cbHeight" min="0.3" max="2.0" step="0.05" value="1.0" oninput="updateChalkSetting('height',this.value)" style="flex:1">
-        <span id="cbHeightVal" style="color:#fff;font-size:11px;width:35px;">1.0</span>
+        <input type="range" id="cbHeight" min="15" max="80" step="1" value="45" oninput="updateChalkSetting('height',this.value)" style="flex:1">
+        <span id="cbHeightVal" style="color:#fff;font-size:11px;width:35px;">45%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="color:#f0d189;font-size:12px;width:70px;">Distance</span>
-        <input type="range" id="cbDistance" min="1.0" max="5.0" step="0.1" value="2.2" oninput="updateChalkSetting('distance',this.value)" style="flex:1">
-        <span id="cbDistanceVal" style="color:#fff;font-size:11px;width:35px;">2.2</span>
+        <span style="color:#f0d189;font-size:12px;width:70px;">Team Font</span>
+        <input type="range" id="cbTeamFont" min="16" max="60" step="1" value="36" oninput="updateChalkFont('team',this.value)" style="flex:1">
+        <span id="cbTeamFontVal" style="color:#fff;font-size:11px;width:35px;">36</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="color:#f0d189;font-size:12px;width:70px;">Elevation</span>
-        <input type="range" id="cbElevation" min="0.1" max="2.5" step="0.05" value="0.9" oninput="updateChalkSetting('elevation',this.value)" style="flex:1">
-        <span id="cbElevationVal" style="color:#fff;font-size:11px;width:35px;">0.9</span>
+        <span style="color:#f0d189;font-size:12px;width:70px;">Score Font</span>
+        <input type="range" id="cbScoreFont" min="24" max="120" step="2" value="72" oninput="updateChalkFont('score',this.value)" style="flex:1">
+        <span id="cbScoreFontVal" style="color:#fff;font-size:11px;width:35px;">72</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="color:#f0d189;font-size:12px;width:70px;">Tilt</span>
-        <input type="range" id="cbTilt" min="-1.0" max="1.0" step="0.05" value="-0.15" oninput="updateChalkSetting('tilt',this.value)" style="flex:1">
-        <span id="cbTiltVal" style="color:#fff;font-size:11px;width:35px;">-0.15</span>
+        <span style="color:#f0d189;font-size:12px;width:70px;">Marks Font</span>
+        <input type="range" id="cbMarksFont" min="16" max="60" step="1" value="32" oninput="updateChalkFont('marks',this.value)" style="flex:1">
+        <span id="cbMarksFontVal" style="color:#fff;font-size:11px;width:35px;">32</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="color:#f0d189;font-size:12px;width:70px;">Info Font</span>
+        <input type="range" id="cbInfoFont" min="10" max="36" step="1" value="18" oninput="updateChalkFont('info',this.value)" style="flex:1">
+        <span id="cbInfoFontVal" style="color:#fff;font-size:11px;width:35px;">18</span>
       </div>
       <button onclick="toggleChalkEditor()" style="align-self:center;margin-top:4px;padding:6px 16px;border-radius:6px;border:none;background:#64748b;color:#fff;font-size:12px;cursor:pointer;">Done</button>
     </div>
@@ -2896,21 +2911,38 @@ let scoreboardTex = null;
 
 // Adjustable scoreboard settings
 const SCOREBOARD = {
-  width: 1.8,         // world units wide
-  height: 1.0,        // world units tall
-  distance: 2.2,      // distance from table center (behind far player)
-  elevation: 0.9,     // height above table surface
-  tilt: -0.15         // lean angle (negative = tilt top toward player)
+  top: 5,        // % from top of screen
+  left: 15,      // % from left
+  width: 70,     // % of screen width
+  height: 45     // % of screen height
 };
+
+const CHALK_FONTS = {
+  team: 36,    // Team 1 / Team 2 headers
+  score: 72,   // Big point numbers
+  marks: 32,   // Marks numbers
+  info: 18     // Bid info, hand number, labels
+};
+
+function updateChalkFont(key, val) {
+  CHALK_FONTS[key] = parseInt(val);
+  document.getElementById('cb' + key.charAt(0).toUpperCase() + key.slice(1) + 'FontVal').textContent = val;
+  updateScoreboard();
+}
 
 function createScoreboard() {
 
-  // HTML scoreboard behind the canvas
+  // HTML scoreboard behind the canvas — styled as chalkboard
   const sb = document.createElement('div');
   sb.id = 'htmlScoreboard';
-  sb.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;font-family:ChalkFont,cursive;';
+  sb.style.cssText = 'position:fixed;top:5%;left:15%;width:70%;height:45%;z-index:0;' +
+    'background:linear-gradient(135deg,#1a3020,#162a18);' +
+    'border:12px solid #5a3a1a;border-radius:4px;' +
+    'box-shadow:inset 0 0 30px rgba(0,0,0,0.5), 0 4px 20px rgba(0,0,0,0.8);' +
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+    'padding:20px;font-family:ChalkFont,cursive;overflow:hidden;';
   document.body.appendChild(sb);
-  scoreboardMesh = sb; // reuse variable to track existence
+  scoreboardMesh = sb;
   updateScoreboard();
 }
 
@@ -2992,29 +3024,29 @@ function updateScoreboard() {
     const bidder = t42_bidWinner === PLAYER_IDX ? 'You' : 'P' + (t42_bidWinner + 1);
     const trumpLabel = t42_trumpMode === 'DOUBLES' ? 'Doubles' :
                        t42_trumpSuit !== null ? t42_trumpSuit + 's' : '—';
-    bidLine = '<div style="color:#f0d189;font-size:18px;margin-top:12px;">Bid: ' + bidder + ' · ' + t42_bidAmount + ' · Trump: ' + trumpLabel + '</div>';
+    bidLine = '<div style="color:#f0d189;font-size:' + CHALK_FONTS.info + 'px;margin-top:12px;">Bid: ' + bidder + ' · ' + t42_bidAmount + ' · Trump: ' + trumpLabel + '</div>';
   }
 
   sb.innerHTML = 
     '<div style="text-align:center;width:100%;max-width:600px;">' +
       '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">' +
-        '<span style="font-family:ChalkBold,cursive;font-size:36px;color:' + t1Color + ';">TEAM 1</span>' +
-        '<span style="font-family:ChalkBold,cursive;font-size:28px;color:#fff;">MARKS</span>' +
-        '<span style="font-family:ChalkBold,cursive;font-size:36px;color:' + t2Color + ';">TEAM 2</span>' +
+        '<span style="font-family:ChalkBold,cursive;font-size:' + CHALK_FONTS.team + 'px;color:' + t1Color + ';">TEAM 1</span>' +
+        '<span style="font-family:ChalkBold,cursive;font-size:' + CHALK_FONTS.info + 'px;color:#fff;">MARKS</span>' +
+        '<span style="font-family:ChalkBold,cursive;font-size:' + CHALK_FONTS.team + 'px;color:' + t2Color + ';">TEAM 2</span>' +
       '</div>' +
       '<div style="display:flex;justify-content:center;align-items:center;gap:16px;margin-bottom:6px;">' +
-        '<span style="font-size:32px;color:' + t1Color + ';">' + m1 + '</span>' +
+        '<span style="font-size:' + CHALK_FONTS.marks + 'px;color:' + t1Color + ';">' + m1 + '</span>' +
         '<span style="font-size:24px;color:#666;">-</span>' +
-        '<span style="font-size:32px;color:' + t2Color + ';">' + m2 + '</span>' +
+        '<span style="font-size:' + CHALK_FONTS.marks + 'px;color:' + t2Color + ';">' + m2 + '</span>' +
       '</div>' +
       '<div style="font-size:14px;color:#555;margin-bottom:16px;">first to ' + t42_marksToWin + '</div>' +
       '<div style="display:flex;justify-content:space-between;gap:20px;">' +
         '<div style="flex:1;border:2px solid ' + t1Color + '44;border-radius:12px;padding:20px;text-align:center;">' +
-          '<div style="font-size:72px;color:#fff;">' + pts1 + '</div>' +
+          '<div style="font-size:' + CHALK_FONTS.score + 'px;color:#fff;">' + pts1 + '</div>' +
           '<div style="font-size:16px;color:#888;">points</div>' +
         '</div>' +
         '<div style="flex:1;border:2px solid ' + t2Color + '44;border-radius:12px;padding:20px;text-align:center;">' +
-          '<div style="font-size:72px;color:#fff;">' + pts2 + '</div>' +
+          '<div style="font-size:' + CHALK_FONTS.score + 'px;color:#fff;">' + pts2 + '</div>' +
           '<div style="font-size:16px;color:#888;">points</div>' +
         '</div>' +
       '</div>' +

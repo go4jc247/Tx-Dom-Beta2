@@ -3065,10 +3065,14 @@ function toggleChalkEditor() {
 function updateChalkSetting(key, val) {
   val = parseFloat(val);
   SCOREBOARD[key] = val;
-  document.getElementById('cb' + key.charAt(0).toUpperCase() + key.slice(1) + 'Val').textContent = val.toFixed(2);
-  // Rebuild geometry for width/height changes
-  // HTML scoreboard — no geometry to update
-  applyScoreboardPosition();
+  var label = document.getElementById('cb' + key.charAt(0).toUpperCase() + key.slice(1) + 'Val');
+  if (label) label.textContent = val.toFixed(0) + '%';
+  var sb = document.getElementById('htmlScoreboard');
+  if (!sb) return;
+  sb.style.top = SCOREBOARD.top + '%';
+  sb.style.left = SCOREBOARD.left + '%';
+  sb.style.width = SCOREBOARD.width + '%';
+  sb.style.height = SCOREBOARD.height + '%';
 }
 
 // Show edit button once scoreboard exists

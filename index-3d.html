@@ -2911,9 +2911,7 @@ function createScoreboard() {
 }
 
 function applyScoreboardPosition() {
-  if (!scoreboardMesh) return;
-  scoreboardMesh.position.set(0, SCOREBOARD.elevation, -SCOREBOARD.distance);
-  scoreboardMesh.rotation.x = SCOREBOARD.tilt;
+  // No-op: scoreboard is now HTML, not 3D mesh
 }
 
 function drawTallyMarks(ctx, count, color, x, y, markH) {
@@ -3033,11 +3031,7 @@ function updateChalkSetting(key, val) {
   SCOREBOARD[key] = val;
   document.getElementById('cb' + key.charAt(0).toUpperCase() + key.slice(1) + 'Val').textContent = val.toFixed(2);
   // Rebuild geometry for width/height changes
-  if (key === 'width' || key === 'height') {
-    const geo = new THREE.PlaneGeometry(SCOREBOARD.width, SCOREBOARD.height);
-    scoreboardMesh.geometry.dispose();
-    scoreboardMesh.geometry = geo;
-  }
+  // HTML scoreboard — no geometry to update
   applyScoreboardPosition();
 }
 

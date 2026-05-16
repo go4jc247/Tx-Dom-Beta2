@@ -1044,7 +1044,7 @@ let LEAN_FORWARD_DIST = R_TABLE * 0.66; // 2/3 of the way toward center
 
 // =================== Three.js setup ===================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x080806);
+// scene.background removed — transparent canvas shows HTML behind
 scene.fog = new THREE.Fog(0x0a0c0a, 4.6, 9.0);
 
 const camera = new THREE.PerspectiveCamera(64, window.innerWidth/window.innerHeight, 0.05, 30);
@@ -1122,7 +1122,7 @@ function setFreeCamMode(on) {
   }
 }
 
-const renderer = new THREE.WebGLRenderer({ antialias:true });
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -2900,33 +2900,13 @@ const SCOREBOARD = {
 };
 
 function createScoreboard() {
-  // Preload fonts for canvas — canvas won't use @font-face until the font is loaded
-  const preload1 = document.createElement('div');
-  preload1.style.cssText = 'position:absolute;top:-9999px;font-family:ChalkBold;font-size:1px;';
-  preload1.textContent = 'x';
-  document.body.appendChild(preload1);
-  const preload2 = document.createElement('div');
-  preload2.style.cssText = 'position:absolute;top:-9999px;font-family:ChalkFont;font-size:1px;';
-  preload2.textContent = 'x';
-  document.body.appendChild(preload2);
-  // Delay first draw to let fonts load
-  setTimeout(() => { updateScoreboard(); }, 500);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024; canvas.height = 576;
-  scoreboardCtx = canvas.getContext('2d');
-  scoreboardTex = new THREE.CanvasTexture(canvas);
-  scoreboardTex.anisotropy = 8;
-
-  const geo = new THREE.PlaneGeometry(SCOREBOARD.width, SCOREBOARD.height);
-  const mat = new THREE.MeshStandardMaterial({
-    map: scoreboardTex,
-    roughness: 0.85,
-    metalness: 0.0
-  });
-  scoreboardMesh = new THREE.Mesh(geo, mat);
-  applyScoreboardPosition();
-  scene.add(scoreboardMesh);
+  // HTML scoreboard behind the canvas
+  const sb = document.createElement('div');
+  sb.id = 'htmlScoreboard';
+  sb.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:-1;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;font-family:ChalkFont,cursive;';
+  document.body.appendChild(sb);
+  scoreboardMesh = sb; // reuse variable to track existence
   updateScoreboard();
 }
 
@@ -2994,90 +2974,51 @@ function chalkLine(ctx, x1, y1, x2, y2, color, width) {
 }
 
 function updateScoreboard() {
-  if (!scoreboardCtx) return;
-  const ctx = scoreboardCtx;
-  const w = 1024, h = 576;
-
-  // Chalkboard background
-  ctx.fillStyle = '#1a3020';
-  ctx.fillRect(0, 0, w, h);
-  // Chalk dust
-  for (let i = 0; i < 400; i++) {
-    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.018})`;
-    ctx.fillRect(Math.random()*w, Math.random()*h, 1+Math.random()*2, 1+Math.random()*2);
-  }
-  // Wooden frame
-  ctx.strokeStyle = '#5a3a1a';
-  ctx.lineWidth = 18;
-  ctx.strokeRect(9, 9, w-18, h-18);
-  ctx.strokeStyle = '#3d2810';
-  ctx.lineWidth = 5;
-  ctx.strokeRect(18, 18, w-36, h-36);
+  const sb = document.getElementById('htmlScoreboard');
+  if (!sb) return;
 
   const yourTeam = t42_teamOf(PLAYER_IDX);
-  const t1Color = 'rgba(130,255,160,0.9)';
-  const t2Color = 'rgba(255,130,130,0.9)';
-  const team1Name = 'TEAM 1';
-  const team2Name = 'TEAM 2';
-
-  // TOP ROW: Team 1 (left) | MARKS (center) | Team 2 (right)
-  chalkBold(ctx, team1Name, 60, 70, 44, t1Color, 'left');
-  chalkBold(ctx, team2Name, w - 60, 70, 44, t2Color, 'right');
-  chalkBold(ctx, 'Marks', w/2, 70, 38, 'rgba(255,255,255,0.8)', 'center');
-
-  // MARKS ROW (center, below header)
+  const t1Color = '#4ade80';
+  const t2Color = '#f87171';
+  const pts1 = scores[0] || 0;
+  const pts2 = scores[1] || 0;
   const m1 = t42_teamMarks[0] || 0;
   const m2 = t42_teamMarks[1] || 0;
-  chalkText(ctx, '' + m1, w/2 - 50, 120, 48, t1Color, 'right');
-  chalkText(ctx, '-', w/2, 120, 48, 'rgba(255,255,255,0.5)', 'center');
-  chalkText(ctx, '' + m2, w/2 + 50, 120, 48, t2Color, 'left');
-  chalkText(ctx, 'first to ' + t42_marksToWin, w/2, 155, 22, 'rgba(255,255,255,0.35)', 'center');
 
-  // DIVIDER
-  chalkLine(ctx, 50, 175, w-50, 175, 'rgba(255,255,255,0.3)', 3);
-
-  // POINTS BOXES: Team 1 (left) | Team 2 (right)
-  const boxY = 195, boxH = 260, boxW = (w - 140) / 2;
-  const box1X = 50, box2X = w/2 + 20;
-
-  // Team 1 box
-  ctx.save();
-  ctx.strokeStyle = t1Color;
-  ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.4;
-  ctx.strokeRect(box1X, boxY, boxW, boxH);
-  ctx.restore();
-
-  // Team 1 points
-  const pts1 = scores[0] || 0;
-  chalkText(ctx, '' + pts1, box1X + boxW/2, boxY + boxH/2 + 30, 100, 'rgba(255,255,255,0.9)', 'center');
-  chalkText(ctx, 'points', box1X + boxW/2, boxY + boxH - 25, 24, 'rgba(255,255,255,0.4)', 'center');
-
-  // Team 2 box
-  ctx.save();
-  ctx.strokeStyle = t2Color;
-  ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.4;
-  ctx.strokeRect(box2X, boxY, boxW, boxH);
-  ctx.restore();
-
-  // Team 2 points
-  const pts2 = scores[1] || 0;
-  chalkText(ctx, '' + pts2, box2X + boxW/2, boxY + boxH/2 + 30, 100, 'rgba(255,255,255,0.9)', 'center');
-  chalkText(ctx, 'points', box2X + boxW/2, boxY + boxH - 25, 24, 'rgba(255,255,255,0.4)', 'center');
-
-  // BID INFO (bottom)
+  let bidLine = '';
   if (t42_bidWinner >= 0 && t42_bidAmount > 0) {
     const bidder = t42_bidWinner === PLAYER_IDX ? 'You' : 'P' + (t42_bidWinner + 1);
     const trumpLabel = t42_trumpMode === 'DOUBLES' ? 'Doubles' :
-                       t42_trumpSuit !== null ? t42_trumpSuit + 's' : '\u2014';
-    chalkText(ctx, 'Bid: ' + bidder + ' \u00b7 ' + t42_bidAmount + ' \u00b7 Trump: ' + trumpLabel, w/2, h - 50, 28, 'rgba(240,209,137,0.8)', 'center');
+                       t42_trumpSuit !== null ? t42_trumpSuit + 's' : '—';
+    bidLine = '<div style="color:#f0d189;font-size:18px;margin-top:12px;">Bid: ' + bidder + ' · ' + t42_bidAmount + ' · Trump: ' + trumpLabel + '</div>';
   }
 
-  // Hand number bottom-right
-  chalkText(ctx, 'Hand ' + roundNumber, w - 60, h - 50, 22, 'rgba(255,255,255,0.35)', 'right');
-
-  scoreboardTex.needsUpdate = true;
+  sb.innerHTML = 
+    '<div style="text-align:center;width:100%;max-width:600px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">' +
+        '<span style="font-family:ChalkBold,cursive;font-size:36px;color:' + t1Color + ';">TEAM 1</span>' +
+        '<span style="font-family:ChalkBold,cursive;font-size:28px;color:#fff;">MARKS</span>' +
+        '<span style="font-family:ChalkBold,cursive;font-size:36px;color:' + t2Color + ';">TEAM 2</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:center;align-items:center;gap:16px;margin-bottom:6px;">' +
+        '<span style="font-size:32px;color:' + t1Color + ';">' + m1 + '</span>' +
+        '<span style="font-size:24px;color:#666;">-</span>' +
+        '<span style="font-size:32px;color:' + t2Color + ';">' + m2 + '</span>' +
+      '</div>' +
+      '<div style="font-size:14px;color:#555;margin-bottom:16px;">first to ' + t42_marksToWin + '</div>' +
+      '<div style="display:flex;justify-content:space-between;gap:20px;">' +
+        '<div style="flex:1;border:2px solid ' + t1Color + '44;border-radius:12px;padding:20px;text-align:center;">' +
+          '<div style="font-size:72px;color:#fff;">' + pts1 + '</div>' +
+          '<div style="font-size:16px;color:#888;">points</div>' +
+        '</div>' +
+        '<div style="flex:1;border:2px solid ' + t2Color + '44;border-radius:12px;padding:20px;text-align:center;">' +
+          '<div style="font-size:72px;color:#fff;">' + pts2 + '</div>' +
+          '<div style="font-size:16px;color:#888;">points</div>' +
+        '</div>' +
+      '</div>' +
+      bidLine +
+      '<div style="font-size:14px;color:#444;margin-top:10px;">Hand ' + roundNumber + '</div>' +
+    '</div>';
 }
 
 // Chalkboard editor toggle

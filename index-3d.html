@@ -1045,7 +1045,7 @@ let LEAN_FORWARD_DIST = R_TABLE * 0.66; // 2/3 of the way toward center
 // =================== Three.js setup ===================
 const scene = new THREE.Scene();
 // scene.background removed — transparent canvas shows HTML behind
-scene.fog = new THREE.Fog(0x0a0c0a, 4.6, 9.0);
+// scene.fog removed — transparent background
 
 const camera = new THREE.PerspectiveCamera(64, window.innerWidth/window.innerHeight, 0.05, 30);
 
@@ -5186,8 +5186,8 @@ function applyLighting(idx) {
   hemiLight.color.setHex(p.hemi.sky);
   hemiLight.groundColor.setHex(p.hemi.ground);
   hemiLight.intensity = p.hemi.intensity;
-  scene.background.setHex(p.bg);
-  scene.fog.color.setHex(p.fog);
+  if(scene.background) scene.background.setHex(p.bg);
+  if(scene.fog) scene.fog.color.setHex(p.fog);
   currentLightingIdx = idx;
   refreshSettingsActive();
   refreshLightControlsValues();
@@ -6691,10 +6691,10 @@ function applyRichMode() {
   richSnapshot = {
     toneMapping: renderer.toneMapping,
     toneMappingExposure: renderer.toneMappingExposure,
-    fogNear: scene.fog.near,
-    fogFar:  scene.fog.far,
-    fogColorHex: scene.fog.color.getHex(),
-    bgHex: scene.background.getHex(),
+    fogNear: scene.fog ? scene.fog.near : 4.6,
+    fogFar: scene.fog ? scene.fog.far : 9.0,
+    fogColorHex: scene.fog ? scene.fog.color.getHex() : 0,
+    bgHex: scene.background ? scene.background.getHex() : 0,
     ambColor: ambientLight.color.getHex(),
     ambIntensity: ambientLight.intensity,
     keyColor: keyLight.color.getHex(),
@@ -6719,8 +6719,8 @@ function applyRichMode() {
   renderer.toneMappingExposure = 1.15;
 
   // Push fog far back so distance-fade doesn't mute everything.
-  scene.fog.near = 7.0;
-  scene.fog.far  = 14.0;
+  if(scene.fog) scene.fog.near = 7.0;
+  if(scene.fog) scene.fog.far = 14.0;
   scene.fog.color.setHex(0x05060a);
   scene.background.setHex(0x05060a);
 

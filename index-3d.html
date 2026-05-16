@@ -617,42 +617,42 @@
     <div style="max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:8px;">
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Top</span>
-        <input type="range" id="cbTop" min="0" max="60" step="1" value="5" oninput="updateChalkSetting('top',this.value)" style="flex:1">
+        <input type="range" id="cbTop" min="0" max="80" step="1" value="5" oninput="updateChalkSetting('top',this.value)" style="flex:1">
         <span id="cbTopVal" style="color:#fff;font-size:11px;width:35px;">5%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Left</span>
-        <input type="range" id="cbLeft" min="0" max="50" step="1" value="15" oninput="updateChalkSetting('left',this.value)" style="flex:1">
+        <input type="range" id="cbLeft" min="0" max="80" step="1" value="15" oninput="updateChalkSetting('left',this.value)" style="flex:1">
         <span id="cbLeftVal" style="color:#fff;font-size:11px;width:35px;">15%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Width</span>
-        <input type="range" id="cbWidth" min="20" max="100" step="1" value="70" oninput="updateChalkSetting('width',this.value)" style="flex:1">
+        <input type="range" id="cbWidth" min="10" max="100" step="1" value="70" oninput="updateChalkSetting('width',this.value)" style="flex:1">
         <span id="cbWidthVal" style="color:#fff;font-size:11px;width:35px;">70%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Height</span>
-        <input type="range" id="cbHeight" min="15" max="80" step="1" value="45" oninput="updateChalkSetting('height',this.value)" style="flex:1">
+        <input type="range" id="cbHeight" min="10" max="100" step="1" value="45" oninput="updateChalkSetting('height',this.value)" style="flex:1">
         <span id="cbHeightVal" style="color:#fff;font-size:11px;width:35px;">45%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Team Font</span>
-        <input type="range" id="cbTeamFont" min="16" max="60" step="1" value="36" oninput="updateChalkFont('team',this.value)" style="flex:1">
+        <input type="range" id="cbTeamFont" min="8" max="100" step="1" value="36" oninput="updateChalkFont('team',this.value)" style="flex:1">
         <span id="cbTeamFontVal" style="color:#fff;font-size:11px;width:35px;">36</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Score Font</span>
-        <input type="range" id="cbScoreFont" min="24" max="120" step="2" value="72" oninput="updateChalkFont('score',this.value)" style="flex:1">
+        <input type="range" id="cbScoreFont" min="12" max="200" step="2" value="72" oninput="updateChalkFont('score',this.value)" style="flex:1">
         <span id="cbScoreFontVal" style="color:#fff;font-size:11px;width:35px;">72</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Marks Font</span>
-        <input type="range" id="cbMarksFont" min="16" max="60" step="1" value="32" oninput="updateChalkFont('marks',this.value)" style="flex:1">
+        <input type="range" id="cbMarksFont" min="8" max="100" step="1" value="32" oninput="updateChalkFont('marks',this.value)" style="flex:1">
         <span id="cbMarksFontVal" style="color:#fff;font-size:11px;width:35px;">32</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="color:#f0d189;font-size:12px;width:70px;">Info Font</span>
-        <input type="range" id="cbInfoFont" min="10" max="36" step="1" value="18" oninput="updateChalkFont('info',this.value)" style="flex:1">
+        <input type="range" id="cbInfoFont" min="6" max="60" step="1" value="18" oninput="updateChalkFont('info',this.value)" style="flex:1">
         <span id="cbInfoFontVal" style="color:#fff;font-size:11px;width:35px;">18</span>
       </div>
       <button onclick="toggleChalkEditor()" style="align-self:center;margin-top:4px;padding:6px 16px;border-radius:6px;border:none;background:#64748b;color:#fff;font-size:12px;cursor:pointer;">Done</button>
